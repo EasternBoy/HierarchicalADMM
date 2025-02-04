@@ -46,7 +46,7 @@ tTree = (rootnode, tree)
 
 
 
-for k = 1:10
+for k = 1:30
     #Forward
     prox!(rootnode, tTree)
     for d in 1:D

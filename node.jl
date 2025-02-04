@@ -94,11 +94,11 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
                 k = k+l[i]
             end
 
-            xch = [vect(tree[d+1][j].couple_state) for j in nd.children]
+            xchild = [vect(tree[d+1][j].couple_state) for j in nd.children]
 
-            res = xch + u
+            res = xchild + u
 
-            J = sum(dot(x[i,:] .- c, x[i,:] .- c) for i in 1:n) + 1/(2λ)*sum(sum((x[i,j] - res[i][j])^2 for j in 1:l[i]) for i in 1:n)
+            J = sum(dot(x[i,:] .- c, x[i,:] .- c) for i in 1:n) + 1/λ*sum(sum((x[i,j] - res[i][j])^2 for j in 1:l[i]) for i in 1:n)
         end
     end
     
