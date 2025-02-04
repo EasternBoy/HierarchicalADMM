@@ -44,13 +44,28 @@ end
 
 tTree = (rootnode, tree)
 
-prox!(rootnode, tTree)
 
-#Forward
-for d in 1:D
-    for i in 1:length(tree[d])
-        prox!(tree[d][i], tTree)
+
+for k = 1:10
+    #Forward
+    prox!(rootnode, tTree)
+    for d in 1:D
+        for i in 1:length(tree[d])
+            prox!(tree[d][i], tTree)
+        end
     end
-end
 
-#Backward
+    #Backward
+    for d in D:-1:1
+        for i in 1:length(tree[d])    
+            if d == 1
+                rootnode.dual_state[i] = rootnode.dual_state[i] + vect(tree[d][i].couple_state) - rootnode.couple_state[i]
+            else
+                p = tree[d][i].parent
+                j = indexin(tree[d][i].index, tree[d-1][p].children)[1]
+                tree[d-1][p].dual_state[j]  = tree[d-1][p].dual_state[j] + vect(tree[d][i].couple_state) - tree[d-1][p].couple_state[j]
+            end
+        end
+    end
+
+end
