@@ -39,14 +39,6 @@ function vect(v::Vector{Float64})
     return v
 end
 
-function query!(nd::node, tree::Vector{Vector{node}})
-    return 0
-end
-
-function response!(parent::node, tree::Vector{Vector{node}})
-    return 0
-end
-
 function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
 
     root  = tTree[1]
@@ -56,7 +48,7 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
     set_optimizer_attribute(nd.opti, "method", BFGS())
     set_silent(nd.opti)
 
-    λ = 1.
+    λ = 0.1
     d = nd.level
     p = nd.parent
     n = length(nd.children)
@@ -74,17 +66,17 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
         if n == 0 #Leaf nodes
             @variable(nd.opti, x[1:length(nd.couple_state)])
 
-            i = indexin(nd.index, parent.children)[1]
+            ic = indexin(nd.index, parent.children)[1]
 
-            q = parent.couple_state[i] - parent.dual_state[i]
+            q = parent.couple_state[ic] - parent.dual_state[ic] #query
 
             J = dot(x .- c, x .- c) + 1/(2λ)*dot(x - q, x - q)
         else #Middle node
             @variable(nd.opti, x[i = 1:length(nd.children), 1:l[i]])
 
-            i = indexin(nd.index, parent.children)[1]
+            ic = indexin(nd.index, parent.children)[1]
 
-            q = parent.couple_state[i] - parent.dual_state[i]
+            q = parent.couple_state[ic] - parent.dual_state[ic] #query
 
             u = nd.dual_state
 
@@ -94,11 +86,11 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
                 k = k+l[i]
             end
 
-            xchild = [vect(tree[d+1][j].couple_state) for j in nd.children]
+            xchild = [vect(tree[d+1][i].couple_state) for i in nd.children]
 
             res = xchild + u
 
-            J = sum(dot(x[i,:] .- c, x[i,:] .- c) for i in 1:n) + 1/λ*sum(sum((x[i,j] - res[i][j])^2 for j in 1:l[i]) for i in 1:n)
+            J = sum(dot(x[i,:] .- c, x[i,:] .- c) for i in 1:n) + 1/λ*sum(sum((x[i,j] - 1/2*res[i][j])^2 for j in 1:l[i]) for i in 1:n)
         end
     end
     
