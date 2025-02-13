@@ -23,9 +23,6 @@ node24   = node(2, 4, 2, Int64[], zeros(nlocal), 2.4)
 node25   = node(2, 5, 3, Int64[], zeros(nlocal), 2.5)
 node26   = node(2, 6, 3, Int64[], zeros(nlocal), 2.6)
 
-
-
-
 tree = [[node11, node12, node13], 
         [node21, node22, node23, node24, node25, node26]];
 
