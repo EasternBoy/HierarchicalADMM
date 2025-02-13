@@ -48,7 +48,7 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
     set_optimizer_attribute(nd.opti, "method", BFGS())
     set_silent(nd.opti)
 
-    λ = 0.1
+    λ = 1.
     d = nd.level
     p = nd.parent
     n = length(nd.children)
@@ -58,7 +58,7 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
     if d == 0 #Root node
         @variable(nd.opti, x[i = 1:n, 1:l[i]])
 
-        q = [nd.dual_state[i] + vect(tree[1][i].couple_state) for i in 1:n]
+        q = [vect(tree[1][i].couple_state) - nd.dual_state[i] for i in 1:n]
 
         J = sum(dot(x[i,:] .- c, x[i,:] .- c) for i in 1:n) + 1/(2λ)*sum(sum((x[i,j] - q[i][j])^2 for j in 1:l[i]) for i in 1:n)
     else
@@ -68,7 +68,7 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
 
             ic = indexin(nd.index, parent.children)[1]
 
-            q = parent.couple_state[ic] - parent.dual_state[ic] #query
+            q = parent.couple_state[ic] + parent.dual_state[ic] #query
 
             J = dot(x .- c, x .- c) + 1/(2λ)*dot(x - q, x - q)
         else #Middle node
@@ -76,7 +76,7 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
 
             ic = indexin(nd.index, parent.children)[1]
 
-            q = parent.couple_state[ic] - parent.dual_state[ic] #query
+            q = parent.couple_state[ic] + parent.dual_state[ic] #query
 
             u = nd.dual_state
 
@@ -88,7 +88,7 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
 
             xchild = [vect(tree[d+1][i].couple_state) for i in nd.children]
 
-            res = xchild + u
+            res = xchild - u
 
             J = sum(dot(x[i,:] .- c, x[i,:] .- c) for i in 1:n) + 1/λ*sum(sum((x[i,j] - 1/2*res[i][j])^2 for j in 1:l[i]) for i in 1:n)
         end

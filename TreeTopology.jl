@@ -46,7 +46,7 @@ tTree = (rootnode, tree)
 
 
 
-for k = 1:50
+for k = 1:100
     println("Step $k")
     #Forward
     prox!(rootnode, tTree)
@@ -60,13 +60,13 @@ for k = 1:50
     for d in D:-1:1
         for i in 1:length(tree[d])    
             if d == 1
-                res = vect(tree[d][i].couple_state) - rootnode.couple_state[i]
+                res = rootnode.couple_state[i] - vect(tree[d][i].couple_state)
                 rootnode.dual_state[i] = rootnode.dual_state[i] + res
                 println(round(norm(res), digits = 3))
             else
                 p   = tree[d][i].parent
                 ic  = indexin(tree[d][i].index, tree[d-1][p].children)[1]
-                res = vect(tree[d][i].couple_state) - tree[d-1][p].couple_state[ic]
+                res = tree[d-1][p].couple_state[ic] - vect(tree[d][i].couple_state)
                 tree[d-1][p].dual_state[ic]  = tree[d-1][p].dual_state[ic] + res
                 println(round(norm(res), digits = 3))
             end
