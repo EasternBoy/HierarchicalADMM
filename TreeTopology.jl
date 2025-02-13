@@ -46,7 +46,7 @@ tTree = (rootnode, tree)
 
 
 
-for k = 1:100
+for k = 1:30
     println("Step $k")
     #Forward
     prox!(rootnode, tTree)

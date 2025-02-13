@@ -48,7 +48,7 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
     set_optimizer_attribute(nd.opti, "method", BFGS())
     set_silent(nd.opti)
 
-    λ = 1.
+    λ = 0.2
     d = nd.level
     p = nd.parent
     n = length(nd.children)
@@ -76,19 +76,19 @@ function prox!(nd::node, tTree::Tuple{node, Vector{Vector{node}}})
 
             ic = indexin(nd.index, parent.children)[1]
 
-            q = parent.couple_state[ic] + parent.dual_state[ic] #query
+            q  = parent.couple_state[ic] + parent.dual_state[ic] #query
 
-            u = nd.dual_state
+            qv = Vector{Vector{Float64}}(undef, n)
 
             k = 1
             for i in 1:n
-                u[i] = u[i] + q[k:(k + l[i] - 1)]
+                qv[i] = q[k:(k + l[i] - 1)]
                 k = k + l[i]
             end
 
             xchild = [vect(tree[d+1][i].couple_state) for i in nd.children]
 
-            res = xchild - u
+            res = xchild - nd.dual_state + qv
 
             J = sum(dot(x[i,:] .- c, x[i,:] .- c) for i in 1:n) + (1/λ)*sum(sum((x[i,j] - 1/2*res[i][j])^2 for j in 1:l[i]) for i in 1:n)
         end
