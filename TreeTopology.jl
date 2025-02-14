@@ -12,7 +12,7 @@ include("node.jl")
 nlocal = 2
 
 D = 3
-rootnode = node(0, 1,-1, [1,2,3], zeros(nlocal), 0.)
+root     = node(0, 1,-1, [1,2,3], zeros(nlocal), 0.)
 node11   = node(1, 1, 0, [1,2],   zeros(nlocal), 1.1)
 node12   = node(1, 2, 0, Int64[], zeros(nlocal), 1.2)
 node13   = node(1, 3, 0, [3,4],   zeros(nlocal), 1.3)
@@ -32,8 +32,8 @@ tree = [[node11, node12, node13],
 for d in D:-1:1
     for i in 1:length(tree[d])
         if d == 1
-            push!(rootnode.couple_state, vect(tree[d][i].couple_state))
-            push!(rootnode.dual_state, vect(tree[d][i].dual_state))
+            push!(root.couple_state, vect(tree[d][i].couple_state))
+            push!(root.dual_state, vect(tree[d][i].dual_state))
         else
             p = tree[d][i].parent
             push!(tree[d-1][p].couple_state, vect(tree[d][i].couple_state))
@@ -42,14 +42,14 @@ for d in D:-1:1
     end
 end
 
-tTree = (rootnode, tree)
+tTree = (root, tree)
 
 
 
-for k = 1:30
+for k = 1:100
     println("Step $k")
     #Forward
-    prox!(rootnode, tTree)
+    prox!(root, tTree)
     for d in 1:D
         for i in 1:length(tree[d])
             prox!(tree[d][i], tTree)
@@ -60,8 +60,8 @@ for k = 1:30
     for d in D:-1:1
         for i in 1:length(tree[d])    
             if d == 1
-                res = rootnode.couple_state[i] - vect(tree[d][i].couple_state)
-                rootnode.dual_state[i] = rootnode.dual_state[i] + res
+                res = root.couple_state[i] - vect(tree[d][i].couple_state)
+                root.dual_state[i] = root.dual_state[i] + res
                 println(round(norm(res), digits = 3))
             else
                 p   = tree[d][i].parent
