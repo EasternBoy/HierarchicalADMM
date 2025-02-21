@@ -23,10 +23,10 @@ J = dot(x21 .- tree[2][1].cost, x21 .- tree[2][1].cost)^2 + #Leaf nodes
     dot([x21;x22] .- tree[1][1].cost, [x21;x22] .- tree[1][1].cost)^2 + 
     dot([x31;x32;x33] .- tree[2][3].cost, [x31;x32;x33] .- tree[2][3].cost)^2 +
     dot([x31;x32;x33;x24] .- tree[1][3].cost, [x31;x32;x33;x24] .- tree[1][3].cost)^2 + 
-    dot([x21;x22;x12;x31;x32;x33;x24] .- root.cost, [x21;x22;x12;x31;x32;x33;x24] .- rootnode.cost)^2 #root
+    dot([x21;x22;x12;x31;x32;x33;x24] .- root.cost, [x21;x22;x12;x31;x32;x33;x24] .- root.cost)^2 #root
 
-    @objective(opti, Min, J)
-    JuMP.optimize!(opti)
+@objective(opti, Min, J)
+@time JuMP.optimize!(opti)
 
 println(JuMP.value.(x21) - tree[2][1].couple_state)
 println(JuMP.value.(x22) - tree[2][2].couple_state)
