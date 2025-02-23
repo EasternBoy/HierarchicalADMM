@@ -1,4 +1,4 @@
-include("TreeTopology.jl")
+include("ExampleTreeTopology.jl")
 
 
 opti = JuMP.Model(Optim.Optimizer)

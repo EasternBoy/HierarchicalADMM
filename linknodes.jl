@@ -1,22 +1,23 @@
 mutable struct linknode
     ID::String
+    nV::Int64
+    dict::Dict{Any, Any}
     children::Union{Vector{linknode}, Nothing}
     parent::Union{linknode, Nothing}
-    dict::Dict{String, Vector{linknode}}
 
     function linknode(ID::String)
-        return  obj = new(ID)
+        obj = new(ID)
+        obj.nV = 0
+        obj.dict = Dict()
+        obj.children = nothing
+        obj.parent = nothing
+        return obj
     end
 end
 
-function setrelative!(parent::linknode, children::Vector{linknode})
+function set_relative!(parent::linknode, children::Vector{linknode})
     parent.children = children
-    for i in 1:length(children) children[i].parent = parent end
-    return nothing
+    for i in 1:length(children) 
+        children[i].parent = parent 
+    end
 end
-
-child1 = linknode("1")
-child2 = linknode("2")
-root   = linknode("0")
-
-setrelative!(root, [child1, child2])
