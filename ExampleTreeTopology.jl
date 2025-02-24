@@ -5,7 +5,7 @@ import Pkg
 using Pkg
 Pkg.activate(@__DIR__)
 
-using LinearAlgebra, Optim, JuMP, Plots
+using LinearAlgebra, Optim, JuMP
 
 mutable struct node
     level::Int64

@@ -16,8 +16,8 @@ function vect(v::Vector{Vector{Float64}})
     return res
 end
 
-function prox!(node::linknode; λ = 0.1)
-
+function prox!(node::linknode; λ = 1.0)
+    println(node.ID)
     
     if node.children === nothing #Leaf nodes
         opti = JuMP.Model(Optim.Optimizer)
@@ -69,17 +69,54 @@ function prox!(node::linknode; λ = 0.1)
     end
 end
 
-function termination(node::linknode)
-    return false
-end
+function hierarchicalADMM!(node::linknode, depth::Int64; max_iter = 20, tol = 1e-2)
 
-function hierarchicalADMM!(node::linknode; max_iter = 1)
-    for k in 1:max_iter
+    termination = 0 #Reset termination
+
+    for step in 1:max_iter
         prox!(node)
-        for child in node.children
-            prox!(child)
+        temp_vec_node = node.children
+
+        for _ in 1:depth 
+            new_vec_node = linknode[]
+            for subnode in temp_vec_node
+                # Forward
+                prox!(subnode)
+                # Forward
+                res = subnode.parent.prime[subnode.ID] -  vect(subnode.prime)
+                subnode.parent.dual[subnode.ID] += res
+
+                if termination < norm(res) #take maximum res as stopping criteria
+                    termination = norm(res)
+                end
+
+                if subnode.children !== nothing
+                    for child in subnode.children
+                        new_vec_node = [new_vec_node; child]
+                    end
+                end
+            end
+            temp_vec_node = new_vec_node
         end
+
+        if termination < tol
+            println("Stop at step $step")
+            return step
+        end
+        termination = 0 #Reset termination
     end
 end
 
-hierarchicalADMM!(root)
+
+# root=linknode(string(countID+=1))
+nN = 15
+nD = 5
+# topo_gen!(root, nN, nD)
+# assign_var!(root)
+
+root = load("myfile.jld2", "root")
+reset_var!(root)
+
+hierarchicalADMM!(root, nN)
+
+print_tree(root)

@@ -49,7 +49,7 @@ end
 
 
 # for specail casese #variables = #dual = #prime (no local variables)
-function assign_var(node::linknode)
+function assign_var!(node::linknode)
     if node.children === nothing #leaf
         node.nV = 1
         push!(node.prime, node.ID => zeros(node.nV))        #keep its prime variable
@@ -73,7 +73,9 @@ end
 
 
 function print_tree(node::linknode, depth=0)
-    println("  "^depth * "Node $(node.ID)")  # Indent based on depth
+    print("  "^depth * "Node $(node.ID): ")  # Indent based on depth
+    print_dict(node.prime)
+    println()
     if node.children !== nothing
         for child in node.children
             print_tree(child, depth + 1)
@@ -81,12 +83,24 @@ function print_tree(node::linknode, depth=0)
     end
 end
 
+function print_dict(dict::Dict)
+    for (x,y) in dict
+        r = round.(y, digits = 3)
+        print(x*"->$r,")
+    end
+end
 
+function reset_var!(node::linknode)
+    for (x,y) in node.prime
+         node.prime[x] = zeros(length(y))  
+    end
 
-root=linknode(string(countID+=1))
-topo_gen!(root, 15, 4)
-assign_var(root)
-
-print_tree(root)
-println(root.prime)
-println(root.dual)
+    for (x,y) in node.dual
+        node.dual[x] = zeros(length(y))  
+    end
+    if node.children !== nothing
+        for child in node.children
+            reset_var!(child)
+        end
+    end
+end
