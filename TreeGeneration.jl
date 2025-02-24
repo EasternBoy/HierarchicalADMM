@@ -1,32 +1,5 @@
 include("linknodes.jl")
 
-#Forward genneration to create a tree topology
-# function topo_gen!(parent::linknode, nN::Int64, nL::Int64, depth=1)
-
-#     if flag == false
-#         alloc = rand(1:nN-nL+1)
-#         nc    = alloc
-#     else
-#         alloc = rand(1:nN-nL+1)
-#     end
-        
-
-#     children = [linknode(string(depth)*string(i)) for i in 1:alloc]
-#     set_relative!(parent, children)
-
-#     if nL-1 > 0
-#         for i in 1:nc
-#             if nN - alloc > 0
-#                 temp = topo_gen!(children[i], nN-alloc, nL-1, depth+1)
-#                 alloc += temp
-#             end
-#         end
-#     else #reach deepest level
-
-#     end
-
-#     return alloc
-# end
 global countID = -1
 function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
     global countID
@@ -37,6 +10,10 @@ function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
         num_child = rand(1:nN)
     end
 
+    if nL == 1
+        num_child = nN
+    end
+
     children = [linknode(string(countID+=1)) for i in 1:num_child]
     set_relative!(node, children)
 
@@ -44,7 +21,7 @@ function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
 
     arr_alloc = Vector{Int64}(zeros(num_child))
 
-    if res_alloc != 0
+    if res_alloc > 0
         for i in 1:num_child
             if i == 1       
                 arr_alloc[i] = rand(min(nL-1,res_alloc):res_alloc) #make sure
@@ -71,15 +48,26 @@ function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
 end
 
 
-root=linknode(string(countID+=1))
-
-topo_gen!(root, 10, 4)
-
+# for specail casese #variables = #dual = #prime (no local variables)
 function assign_var(node::linknode)
-    if node.children === nothing
-        return 0
+    if node.children === nothing #leaf
+        node.nV = 1
+        push!(node.prime, node.ID => zeros(node.nV))        #keep its prime variable
+        push!(node.parent.prime, node.ID => zeros(node.nV)) #initiate a prime variable in its parent
+        push!(node.parent.dual,  node.ID => zeros(node.nV)) #initiate a dual variable in its parent
     else
-        
+        for child in node.children
+            assign_var(child) #go to next layer
+            push!(node.prime, child.ID => zeros(child.nV)) #when next layers are initiated, push a prime variable
+            push!(node.dual,  child.ID => zeros(child.nV)) #when next layers are initiated, push a dual variable
+        end
+        for (x,y) in node.prime
+            node.nV += length(y) #calculate total number of variables
+        end
+        if node.parent !== nothing #not leaf node
+            push!(node.parent.prime, node.ID => zeros(node.nV)) #initiate a prime variable in its parent
+            push!(node.parent.dual,  node.ID => zeros(node.nV)) #initiate a dual variable in its parent
+        end
     end
 end
 
@@ -93,4 +81,12 @@ function print_tree(node::linknode, depth=0)
     end
 end
 
+
+
+root=linknode(string(countID+=1))
+topo_gen!(root, 15, 4)
+assign_var(root)
+
 print_tree(root)
+println(root.prime)
+println(root.dual)
