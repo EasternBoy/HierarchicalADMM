@@ -1,6 +1,6 @@
 using LinearAlgebra, Optim, JuMP, JLD2
 
-function costfunction(x::Vector{VariableRef}, para::Float64)
+function costfunction(x::AbstractArray, para::Float64)
     return (x.-para)'*(x.-para)
 end
 

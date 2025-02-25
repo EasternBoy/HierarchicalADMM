@@ -1,122 +1,127 @@
+push!(LOAD_PATH, ".")
+
+import Pkg
+using Pkg
+
 include("TreeGeneration.jl")
 
-function vect(dict::Dict)
+#Vectorize prime dict of a node in the same order as its children
+function vectp(node::linknode)
     result = Float64[]
-    for (x,y) in dict
-        result = [result; y]
+    if node.children === nothing #leaf: only element in its prime dict
+        result = node.prime[node.ID]
+    else #middle nodes: 
+        for i in 1:length(node.children)
+            result = [result; node.prime[node.children[i].ID]]
+        end
     end
     return result
 end
 
-function vect(v::Vector{Vector{Float64}})
-    res = Float64[]
-    for i in 1:length(v)
-        res = [res; v[i]]
-    end
-    return res
-end
-
-function prox!(node::linknode; λ = 1.0)
-    println(node.ID)
-    
+function prox!(node::linknode; λ = 0.1)    
     if node.children === nothing #Leaf nodes
-        opti = JuMP.Model(Optim.Optimizer)
-
-        var = @variable(opti, [1:node.nV])
-
         q = node.parent.prime[node.ID] + node.parent.dual[node.ID] #query
 
-        J = node.costfunction(var, parse(Float64, node.ID)) + 1/(2λ)*dot(var - q, var - q)
+        opti = JuMP.Model(Optim.Optimizer)
+        @variable(opti, x[1:node.nV])
+        c = parse(Float64, node.ID)
+        J = node.costfunction(x, c) + 1/(2λ)*(x - q)'*(x - q)
     elseif node.parent === nothing #Root node
-        nc   = length(node.children)
-        opti = JuMP.Model(Optim.Optimizer)
-        var  = Vector{Vector{VariableRef}}(undef, nc)
+        nc = length(node.children)
+        q  = [vectp(node.children[i]) - node.dual[node.children[i].ID] for i in 1:nc]
 
+        opti = JuMP.Model(Optim.Optimizer)
+ 
+        l = [node.children[i].nV for i in 1:nc]
+        @variable(opti, x[i = 1:nc, 1:l[i]])
+
+        c = parse(Float64, node.ID)
+        J = sum(node.costfunction([x[i,j] for j in l[i]], c) for i in 1:nc) + 1/(2λ)*sum(sum((x[i,j] - q[i][j])^2 for j in 1:l[i]) for i in 1:nc)
+    else #Middle node
+        nc = length(node.children)
+        q  = node.parent.prime[node.ID] + node.parent.dual[node.ID]
+
+        v = Vector{Vector{Float64}}(undef, nc)
+        l = [node.children[i].nV for i in 1:nc]
+        k = 1
         for i in 1:nc
-            var[i] =  @variable(opti, [1:node.children[i].nV])
+            v[i] = q[k:(k + l[i] - 1)]
+            k = k + l[i]
         end
 
-        q = [vect(node.children[i].prime) - node.dual[node.children[i].ID] for i in 1:nc]
+        res = v - [node.dual[node.children[i].ID] for i in 1:nc] + [vectp(node.children[i]) for i in 1:nc]
 
-        J = sum(node.costfunction(var[i], parse(Float64, node.ID))  + 1/(2λ)*(var[i] - q[i])'*(var[i] - q[i])  for i in 1:nc)
-    else
-        nc   = length(node.children)
         opti = JuMP.Model(Optim.Optimizer)
-        var  = Vector{Vector{VariableRef}}(undef, nc)
+        
+        @variable(opti, x[i = 1:nc, 1:l[i]])
+        c = parse(Float64, node.ID)
 
-        res  = node.parent.prime[node.ID] + node.parent.dual[node.ID] #query
-        res  = res - vect(node.dual) + vect([vect(node.children[i].prime) for i in 1:nc])
-
-        v = []
-        for i in 1:nc
-            var[i] =  @variable(opti, [1:node.children[i].nV])
-            v = [v; var[i]]
-        end
-
-        J = sum(node.costfunction(var[i], parse(Float64, node.ID)) for i in 1:nc) + 1/λ*(v - res/2)'*(v - res/2)   
+        J = sum(node.costfunction([x[i,j] for j in l[i]], c) for i in 1:nc) + (1/λ)*sum(sum((x[i,j] - res[i][j]/2)^2  for j in 1:l[i]) for i in 1:nc)
     end
 
     @objective(opti, Min, J)
     JuMP.optimize!(opti)
+    x = JuMP.value.(x)
 
+    #Update prime variable
     if node.children === nothing #leaf node has only one
-        node.prime[node.ID] = JuMP.value.(var)
+        node.prime[node.ID] = x
     else
         for i in 1:nc
             ID = node.children[i].ID
-            node.prime[ID] = JuMP.value.(var[i])
+            node.prime[ID] = [x[i,j] for j in 1:node.children[i].nV]
         end
     end
 end
 
-function hierarchicalADMM!(node::linknode, depth::Int64; max_iter = 20, tol = 1e-2)
+function hierarchicalADMM!(node::linknode)
+    res = 0
+    #Update prime
+    prox!(node)
+    if node.children !== nothing
+        for child in node.children
+            hierarchicalADMM!(child)
+            #Update dual
+            res = child.parent.prime[child.ID] -  vectp(child)
+            child.parent.dual[child.ID] += res
+        end
+    else
+        #Update dual
+        res = node.parent.prime[node.ID] -  vectp(node)
+        node.parent.dual[node.ID] += res
+    end
 
-    termination = 0 #Reset termination
+    return norm(res)
+end
 
+global step_arr = Int64[]
+
+for _ in 1:50
+    global countID
+    global step_arr
+
+
+    nN   = 20
+    nD   = 6
+    tol  = 0.1
+
+    root = linknode(string(countID+=1))
+    topo_gen!(root, nN, nD)
+    assign_var!(root)
+
+    max_iter = 200
     for step in 1:max_iter
-        prox!(node)
-        temp_vec_node = node.children
-
-        for _ in 1:depth 
-            new_vec_node = linknode[]
-            for subnode in temp_vec_node
-                # Forward
-                prox!(subnode)
-                # Forward
-                res = subnode.parent.prime[subnode.ID] -  vect(subnode.prime)
-                subnode.parent.dual[subnode.ID] += res
-
-                if termination < norm(res) #take maximum res as stopping criteria
-                    termination = norm(res)
-                end
-
-                if subnode.children !== nothing
-                    for child in subnode.children
-                        new_vec_node = [new_vec_node; child]
-                    end
-                end
-            end
-            temp_vec_node = new_vec_node
-        end
-
+        termination = hierarchicalADMM!(root)
+        # if step%10 ==  0 println("Step $step: $termination") end
         if termination < tol
-            println("Stop at step $step")
-            return step
+            step_arr = [step_arr; step]
+            println("Terminate at step $step")
+            break
         end
-        termination = 0 #Reset termination
     end
+
+    # print_tree(root)
+    countID = -1
 end
 
-
-# root=linknode(string(countID+=1))
-nN = 15
-nD = 5
-# topo_gen!(root, nN, nD)
-# assign_var!(root)
-
-root = load("myfile.jld2", "root")
-reset_var!(root)
-
-hierarchicalADMM!(root, nN)
-
-print_tree(root)
+println(sum(step_arr)/length(step_arr))

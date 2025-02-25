@@ -57,7 +57,7 @@ function assign_var!(node::linknode)
         push!(node.parent.dual,  node.ID => zeros(node.nV)) #initiate a dual variable in its parent
     else
         for child in node.children
-            assign_var(child) #go to next layer
+            assign_var!(child) #go to next layer
             push!(node.prime, child.ID => zeros(child.nV)) #when next layers are initiated, push a prime variable
             push!(node.dual,  child.ID => zeros(child.nV)) #when next layers are initiated, push a dual variable
         end
@@ -74,7 +74,7 @@ end
 
 function print_tree(node::linknode, depth=0)
     print("  "^depth * "Node $(node.ID): ")  # Indent based on depth
-    print_dict(node.prime)
+    print_dict(node)
     println()
     if node.children !== nothing
         for child in node.children
@@ -83,10 +83,14 @@ function print_tree(node::linknode, depth=0)
     end
 end
 
-function print_dict(dict::Dict)
-    for (x,y) in dict
-        r = round.(y, digits = 3)
-        print(x*"->$r,")
+function print_dict(node::linknode)
+    if node.children !== nothing
+        for (x,y) in node.prime
+            r = round.(y, digits = 3)
+            print(x*"->$r, ")
+        end
+    else
+        print(node.prime[node.ID])
     end
 end
 
