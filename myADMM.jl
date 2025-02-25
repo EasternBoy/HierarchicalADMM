@@ -1,8 +1,3 @@
-push!(LOAD_PATH, ".")
-
-import Pkg
-using Pkg
-
 include("TreeGeneration.jl")
 
 #Vectorize prime dict of a node in the same order as its children
@@ -75,53 +70,25 @@ function prox!(node::linknode; λ = 0.1)
 end
 
 function hierarchicalADMM!(node::linknode)
-    res = 0
+    ter = 0
     #Update prime
     prox!(node)
     if node.children !== nothing
         for child in node.children
-            hierarchicalADMM!(child)
+            temp_ter = hierarchicalADMM!(child)
             #Update dual
             res = child.parent.prime[child.ID] -  vectp(child)
             child.parent.dual[child.ID] += res
+            #Take the maximum residual error for stopping criteria
+            ter = (temp_ter > maximum(abs.(res))) ? temp_ter : maximum(abs.(res))
         end
     else
         #Update dual
         res = node.parent.prime[node.ID] -  vectp(node)
         node.parent.dual[node.ID] += res
+        #Take the maximum residual error for stopping criteria
+        ter = (ter > maximum(abs.(res))) ? ter : maximum(abs.(res))
     end
 
-    return norm(res)
+    return ter
 end
-
-global step_arr = Int64[]
-
-for _ in 1:50
-    global countID
-    global step_arr
-
-
-    nN   = 20
-    nD   = 6
-    tol  = 0.1
-
-    root = linknode(string(countID+=1))
-    topo_gen!(root, nN, nD)
-    assign_var!(root)
-
-    max_iter = 200
-    for step in 1:max_iter
-        termination = hierarchicalADMM!(root)
-        # if step%10 ==  0 println("Step $step: $termination") end
-        if termination < tol
-            step_arr = [step_arr; step]
-            println("Terminate at step $step")
-            break
-        end
-    end
-
-    # print_tree(root)
-    countID = -1
-end
-
-println(sum(step_arr)/length(step_arr))

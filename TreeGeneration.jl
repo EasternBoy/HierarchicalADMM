@@ -90,7 +90,8 @@ function print_dict(node::linknode)
             print(x*"->$r, ")
         end
     else
-        print(node.prime[node.ID])
+        r = round.(node.prime[node.ID], digits = 3)
+        print(r)
     end
 end
 
