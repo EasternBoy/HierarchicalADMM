@@ -1,15 +1,32 @@
 using LinearAlgebra
 using Zygote
-using DifferentiationInterface: AutoZygote
 using ProximalOperators
 using ProximalAlgorithms
+using DifferentiationInterface: AutoZygote
 
-quadratic_cost = ProximalAlgorithms.AutoDifferentiable(
-    x -> dot([3.4 1.2; 1.2 4.5] * x, x) / 2 + dot([-2.3, 9.9], x),
-    AutoZygote(),
+# Setup
+n = 10
+γ = randn(n)
+λ = 0.1
+
+# Smooth function f(x) = 0.5 * ||x - γ||^2
+f = ProximalAlgorithms.AutoDifferentiable(
+    x -> 0.5 * dot(x - γ, x - γ),
+    AutoZygote()
 )
-box_indicator = ProximalOperators.IndBox(0, 1)
 
-ffb = ProximalAlgorithms.FastForwardBackward(maxit = 1000, tol = 1e-5, verbose = true)
+# Proximal operator (non-smooth part): g(x) = λ * ||x||₁
+g = NormL1(λ)  # 
 
-solution, iterations = ffb(x0 = ones(2), f = quadratic_cost, g = box_indicator)
+# Initial point
+x0 = zeros(n)
+
+# Set up and run PANOC
+panoc = ProximalAlgorithms.PANOC(maxit = 500, tol = 1e-6, verbose = true)
+
+# This is now fully correct
+solution, iterations = panoc(f = f, g = g, x0 = x0)
+
+# Display result
+println("\n✅ Optimal solution x:\n", solution)
+println("🔁 Total iterations: ", iterations)

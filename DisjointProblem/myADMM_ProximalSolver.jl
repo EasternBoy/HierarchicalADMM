@@ -15,7 +15,6 @@ end
 function prox!(node::linknode; λ = 0.01)  
     global tot_com
 
-    opti = JuMP.Model(Optim.Optimizer)
     cst  = parse(Float64, node.ID)
 
     
@@ -24,9 +23,7 @@ function prox!(node::linknode; λ = 0.01)
         # Received prime + dual from parent
         tot_com += 1
 
-        @variable(opti, x[1:node.nV])
-
-        J = costfunction(x, cst) + 1/(2λ)*(x - q)'*(x - q)
+        f, g = Proximal_Iteration(q, λ)
 
     elseif node.parent === nothing #Root node
         nc = length(node.children)

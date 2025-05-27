@@ -1,11 +1,12 @@
 using LinearAlgebra, Optim, JuMP
+using Zygote
+using ProximalOperators
+using ProximalAlgorithms
+using ProximalCore
+using DifferentiationInterface: AutoZygote
 
-function costfunction(x, para::Float64)
-    return dot(x.-para, x.-para)^2
-end
-
-function costfunction(x::JuMP.Containers.SparseAxisArray, para::Float64, nc::Int64)
-    return sum(dot(x[i,:] .- para, x[i,:] .- para) for i in 1:nc)^2
+function cost_func(x, p)
+    return dot(x .- p, x .- p)^2
 end
 
 mutable struct linknode
@@ -15,7 +16,8 @@ mutable struct linknode
     dual::Dict{Any, Any}
     children::Union{Vector{linknode}, Nothing}
     parent::Union{linknode, Nothing}
-    # costfunction::Function
+    prox
+    cost_fnc::Function
 
     function linknode(ID::String)
         obj = new(ID)
@@ -23,7 +25,8 @@ mutable struct linknode
         obj.prime = Dict()
         obj.dual  = Dict()
         obj.children = nothing
-        obj.parent = nothing
+        obj.parent   = nothing
+        obj.prox     = ProximalAlgorithms.PANOC(maxit = 500, tol = 1e-6, verbose = true)
         return obj
     end
 end
@@ -61,4 +64,16 @@ function add_edge_graph!(parent::linknode, g)
             add_edge_graph!(child, g)
         end
     end
+end
+
+
+
+function Proximal_Iteration(p::Vector{Float64}, q::Vector{Float64}, λ::Float64)
+    f = ProximalAlgorithms.AutoDifferentiable(
+        x -> 1/(2λ) * dot(x - q, x - q) + dot(x .- p, x .- p)^2,
+        AutoZygote()
+    )
+
+    g = ProximalOperators.IndBox(0, 1)
+    return f, g
 end
