@@ -1,9 +1,4 @@
 using LinearAlgebra, Optim, JuMP
-using Zygote
-using ProximalOperators
-using ProximalAlgorithms
-using ProximalCore
-using DifferentiationInterface: AutoZygote
 
 function cost_func(x, p)
     return dot(x .- p, x .- p)^2
@@ -26,7 +21,7 @@ mutable struct linknode
         obj.dual  = Dict()
         obj.children = nothing
         obj.parent   = nothing
-        obj.prox     = ProximalAlgorithms.PANOC(maxit = 500, tol = 1e-6, verbose = true)
+        obj.prox     = ProximalAlgorithms.PANOC(maxit = 500, tol = 1e-6, verbose = false)
         return obj
     end
 end
@@ -64,16 +59,4 @@ function add_edge_graph!(parent::linknode, g)
             add_edge_graph!(child, g)
         end
     end
-end
-
-
-
-function Proximal_Iteration(p::Vector{Float64}, q::Vector{Float64}, λ::Float64)
-    f = ProximalAlgorithms.AutoDifferentiable(
-        x -> 1/(2λ) * dot(x - q, x - q) + dot(x .- p, x .- p)^2,
-        AutoZygote()
-    )
-
-    g = ProximalOperators.IndBox(0, 1)
-    return f, g
 end

@@ -132,6 +132,7 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
 
     #Update prime
     prox!(node)
+    
 
     if node.children !== nothing
         for child in node.children

@@ -45,7 +45,7 @@ function getGlobalCostFunction!(node::linknode, dict::Dict, J::Vector{NonlinearE
     getVarName!(node, varName)
     c = parse(Float64, node.ID)
     vec_vars = [dict[name] for name in varName]
-    push!(J, costfunction(vec_vars, c))
+    push!(J, cost_func(vec_vars, c))
     if node.children !== nothing
         for child in node.children
             getGlobalCostFunction!(child, dict, J)

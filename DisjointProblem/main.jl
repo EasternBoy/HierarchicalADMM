@@ -5,7 +5,7 @@ using Pkg, Plots, Graphs, GraphRecipes
 Pkg.activate(".")
 Pkg.instantiate()
 
-include("myADMM_ProximalOp.jl")
+include("myADMM_ProximalSolver.jl")
 include("getGlobal.jl")
 
 

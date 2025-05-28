@@ -1,4 +1,11 @@
+using Zygote
+using ProximalOperators
+using ProximalAlgorithms
+using ProximalCore
+using DifferentiationInterface: AutoZygote
+
 include("TreeGeneration.jl")
+
 #Vectorize prime dict of a node in the same order as its children
 function vectp(node::linknode)
     result = Float64[]
@@ -12,65 +19,78 @@ function vectp(node::linknode)
     return result
 end
 
-function prox!(node::linknode; λ = 0.01)  
+function vect_dual(node::linknode)
+    result = Float64[]
+    for child in node.children
+        result = [result; node.dual[child.ID]]
+    end
+    return result
+end
+
+function Proximal_Iteration(p::Float64, q::Union{Float64, Vector{Float64}}, λ::Float64)
+    f = ProximalAlgorithms.AutoDifferentiable(
+        x -> 1/(2λ) * dot(x .- q, x .- q) + cost_func(x, p),
+        AutoZygote()
+    )
+    g = ProximalOperators.IndBox(1e-6, Inf)
+    return f, g
+end
+
+function proxAlg!(node::linknode; λ = 0.01)  
     global tot_com
 
-    cst  = parse(Float64, node.ID)
+    nc = 0
+    p  = parse(Float64, node.ID)
+    q  = Float64[]
+    x0 = vectp(node)
 
     
     if node.children === nothing #Leaf nodes
         q = node.parent.prime[node.ID] + node.parent.dual[node.ID] #query
-        # Received prime + dual from parent
-        tot_com += 1
 
-        f, g = Proximal_Iteration(q, λ)
+        tot_com += 1    # Received prime + dual from parent
 
+        f, g = Proximal_Iteration(p, q, λ)
     elseif node.parent === nothing #Root node
         nc = length(node.children)
-        dc  = [node.children[i].nV for i in 1:nc]
 
-        q  = [vectp(node.children[i]) - node.dual[node.children[i].ID] for i in 1:nc]
-        # Received prime from all children
-        tot_com += nc
- 
-        @variable(opti, x[i = 1:nc, 1:dc[i]])
-
-        J = costfunction(x, cst, nc) + 1/(2λ)*sum(sum((x[i,j] - q[i][j])^2 for j in 1:dc[i]) for i in 1:nc)
-    else #Middle node
-        nc = length(node.children)
-        dc = [node.children[i].nV for i in 1:nc]
-
-        par  = node.parent.prime[node.ID] + node.parent.dual[node.ID]
-        # Received prime + dual from parent
-        tot_com += 1
-
-        par_vec = Vector{Vector{Float64}}(undef, nc)
-        index = 1
         for i in 1:nc
-            par_vec[i] = par[index:(index + dc[i] - 1)]
-            index = index + dc[i]
+            q = [q; vectp(node.children[i]) - node.dual[node.children[i].ID]]
         end
 
-        res = par_vec - [node.dual[node.children[i].ID] for i in 1:nc] + [vectp(node.children[i]) for i in 1:nc]
+        tot_com += nc   #Received prime from all children
+
+        f, g = Proximal_Iteration(p, q, λ)
+    else #Middle node
+        nc = length(node.children)
+
+        par  = node.parent.prime[node.ID] + node.parent.dual[node.ID]
+
+        tot_com += 1    #Received prime + dual from parent
+
+        ch_pr = Float64[]
+        for i in 1:nc
+            ch_pr = [ch_pr; vectp(node.children[i])]
+        end
         # Received prime from all children
         tot_com += nc
-        
-        @variable(opti, x[i = 1:nc, 1:dc[i]])
 
-        J = costfunction(x, cst, nc) + (1/λ)*sum(sum((x[i,j] - 1/2*res[i][j])^2  for j in 1:dc[i]) for i in 1:nc)
+        q = [q; par - vect_dual(node) + ch_pr]
+        f, g = Proximal_Iteration(p, q/2, λ/2)
     end
 
-    @objective(opti, Min, J)
-    JuMP.optimize!(opti)
-    x = JuMP.value.(x)
+    solution, iterations = node.prox(f = f, g = g, x0 = x0)
 
     #Update prime variable
     if node.children === nothing #leaf node has only one
-        node.prime[node.ID] = x
+        node.prime[node.ID] = solution
     else
+        dc = [node.children[i].nV for i in 1:nc]
+        index = 1
         for i in 1:nc
             ID = node.children[i].ID
-            node.prime[ID] = [x[i,j] for j in 1:node.children[i].nV]
+            node.prime[ID] = solution[index:(index + dc[i]-1)]
+            index += dc[i]
         end
     end
 end
@@ -126,7 +146,7 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
     global tot_com
 
     #Update prime
-    prox!(node)
+    proxAlg!(node)
 
     if node.children !== nothing
         for child in node.children
