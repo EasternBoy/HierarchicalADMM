@@ -1,9 +1,3 @@
-using Zygote
-using ProximalOperators
-using ProximalAlgorithms
-using ProximalCore
-using DifferentiationInterface: AutoZygote
-
 include("TreeGeneration.jl")
 
 #Vectorize prime dict of a node in the same order as its children

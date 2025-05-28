@@ -1,4 +1,9 @@
 using LinearAlgebra, Optim, JuMP
+using Zygote
+using ProximalOperators
+using ProximalAlgorithms
+using ProximalCore
+using DifferentiationInterface: AutoZygote
 
 function cost_func(x, p)
     return dot(x .- p, x .- p)^2
