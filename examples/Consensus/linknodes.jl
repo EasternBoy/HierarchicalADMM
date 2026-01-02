@@ -170,6 +170,18 @@ function vect_dual(node::linknode)
     return result
 end
 
+function vect_prime(node::linknode)
+    result = Float64[]
+    if node.children === nothing #leaf: only element in its prime dict
+        result = node.prime[node.ID]
+    else #middle nodes: 
+        for child in node.children
+            append!(result, node.prime[child.ID])
+        end
+    end
+    return result
+end
+
 function vect_child(node::linknode)
     result = Float64[]
     

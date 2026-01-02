@@ -75,5 +75,5 @@ println("hADMM total communication: $hADMM_total, maximum number of iteration: $
 plot!(fig1, 1:length(J_HADMM), (J_HADMM .- opt_cen)/maximum(J_HADMM .- opt_cen) , yscale = :log10, xlimit = [1, length(J_HADMM)], grid = true, label = "")
 plot!(fig2, 1:length(Res_arr), Res_arr, yscale = :log10, xlimit = [1, length(Res_arr)], grid = true, label = "")
 
-png(fig1, joinpath("code","HADMM-convergence","Figs","SP-Cost-Conver"))
-png(fig2, joinpath("code","HADMM-convergence","Figs","SP-Res-Conver"))
+png(fig1, joinpath("media","figs","sharing_problem","SP-Cost-Conver"))
+png(fig2, joinpath("media","figs","sharing_problem","SP-Res-Conver"))

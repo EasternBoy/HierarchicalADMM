@@ -1,5 +1,12 @@
 include("TreeGeneration.jl")
 
+using LinearAlgebra, JuMP, Optim
+using Zygote
+using ProximalAlgorithms
+using ProximalOperators
+using DifferentiationInterface: AutoZygote
+
+
 function ProximalAlgorithms.value_and_gradient(cost_func::CostFunc, x)
     prm  = cost_func.para
     q = cost_func.q 

@@ -1,4 +1,4 @@
-include("linknodes.jl")
+include("../../src/linknodes.jl")
 
 # Define cost function and its gradient for each type of node
 # Leaf nodes
