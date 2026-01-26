@@ -17,11 +17,11 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 30
+const nN   = 10
 const nD   = 3
 
-const λₙ   = 6e-4
-const λₕ   = 6e-4
+const λₙ   = 10e-3
+const λₕ   = 8e-3
 const tol  = 1e-4
 const max_iter = 1000
 
@@ -90,9 +90,9 @@ figJ = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xl
     println()
 end
 
-png(figPrime, joinpath("code","HADMM-convergence","Figs",string("DJ-Prime-Conver D=",string(nD)," N=",string(nN))))
-png(figRes, joinpath("code","HADMM-convergence","Figs",string("DJ-Res-Conver D=",string(nD)," N=",string(nN))))
-png(figJ, joinpath("code","HADMM-convergence","Figs",string("DJ-Cost-Conver D=",string(nD)," N=",string(nN))))
+savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver D=",string(nD),"-N=",string(nN),".pdf")))
+savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver D=",string(nD),"-N=",string(nN),".pdf")))
+savefig(figJ, joinpath("media","figs","disjoint_problem",string("DJ-Cost-Conver D=",string(nD),"-N=",string(nN),".pdf")))
 
 medstep = Dict()
 for (key, value) in node_iter
@@ -116,9 +116,9 @@ for (key, value) in tt_com
     println("$key Total number of scalar variables sent in network (min) avg. (max): ($min_value) $med ($max_value)")
 end
 
-npzwrite(joinpath("code","HADMM-convergence","Data",string("Max-iter-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=",Int(round(medstep["fADMM"])),".npz")), node_iter)
-npzwrite(joinpath("code","HADMM-convergence","Data",string("Max-com-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=", Int(round(medstep["fADMM"])),".npz")), max_com)
-npzwrite(joinpath("code","HADMM-convergence","Data",string("Tot-com-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=", Int(round(medstep["fADMM"])),".npz")), tt_com)
+npzwrite(joinpath("data","disjoint-problem",string("Max-iter-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=",Int(round(medstep["fADMM"])),".npz")), node_iter)
+npzwrite(joinpath("data","disjoint-problem",string("Max-com-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=", Int(round(medstep["fADMM"])),".npz")), max_com)
+npzwrite(joinpath("data","disjoint-problem",string("Tot-com-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=", Int(round(medstep["fADMM"])),".npz")), tt_com)
 
 # println("Fastest Convergence Topology $least_index after $least_iter steps")
 # print_tree(topo_arr[least_index])

@@ -5,9 +5,9 @@ using StatsPlots, NPZ, Plots, Statistics, Plots
 
 
 function network_data(D, N, h, f)
-    r1 = npzread(joinpath("code","HADMM-convergence","Data",string("Max-iter-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz")))
-    r2 = npzread(joinpath("code","HADMM-convergence","Data",string("Max-com-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz")))
-    r3 = npzread(joinpath("code","HADMM-convergence","Data",string("Tot-com-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz")))
+    r1 = npzread(joinpath("data","disjoint-problem",string("Max-iter-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz")))
+    r2 = npzread(joinpath("data","disjoint-problem",string("Max-com-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz")))
+    r3 = npzread(joinpath("data","disjoint-problem",string("Tot-com-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz")))
 
     return r1,r2,r3    
 end
@@ -29,7 +29,7 @@ for (key, value) in tt_com1
     end
 end
 annotate!((0, ylims(plt1)[2], text("x100", :left, tickfont)))
-png(plt1,joinpath("code","HADMM-convergence","Figs","Tot-com-3-10.png"))
+savefig(plt1,joinpath("media","figs","disjoint_problem","Tot-com-3-10.pdf"))
 
 
 plt2 = plot(size = (400,600), tickfont = tickfont, yticks = [10, 12, 14, 16, 18, 20])
@@ -40,7 +40,7 @@ for (key, value) in tt_com2
     end
 end
 annotate!((0, ylims(plt2)[2], text("×100", :left, tickfont)))
-png(plt2,joinpath("code","HADMM-convergence","Figs","Tot-com-3-20.png"))
+savefig(plt2,joinpath("media","figs","disjoint_problem","Tot-com-3-20.pdf"))
 
 plt3 = plot(size = (400,600), tickfont = tickfont)
 for (key, value) in tt_com3
@@ -50,7 +50,7 @@ for (key, value) in tt_com3
     end
 end
 annotate!((0, ylims(plt3)[2], text("×100", :left, tickfont)))
-png(plt3,joinpath("code","HADMM-convergence","Figs","Tot-com-5-20.png"))
+savefig(plt3,joinpath("media","figs","disjoint_problem","Tot-com-5-20.pdf"))
 
 
 plt4 = plot(size = (400,600),  tickfont = tickfont)
@@ -61,7 +61,7 @@ for (key, value) in max_com1
     end
 end
 annotate!((0, ylims(plt4)[2], text("×100", :left, tickfont)))
-png(plt4,joinpath("code","HADMM-convergence","Figs","Max-com-3-10.png"))
+savefig(plt4,joinpath("media","figs","disjoint_problem","Max-com-3-10.pdf"))
 
 plt5 = plot(size = (400,600),  tickfont = tickfont)
 for (key, value) in max_com2
@@ -71,7 +71,7 @@ for (key, value) in max_com2
     end
 end
 annotate!((0, ylims(plt5)[2], text("×100", :left, tickfont)))
-png(plt5,joinpath("code","HADMM-convergence","Figs","Max-com-3-20.png"))
+savefig(plt5,joinpath("media","figs","disjoint_problem","Max-com-3-20.pdf"))
 
 plt6 = plot(size = (400,600),  tickfont = tickfont)
 for (key, value) in max_com3
@@ -81,7 +81,13 @@ for (key, value) in max_com3
     end
 end
 annotate!((0, ylims(plt6)[2], text("×100", :left, tickfont)))
-png(plt6,joinpath("code","HADMM-convergence","Figs","Max-com-5-20.png"))
+savefig(plt6,joinpath("media","figs","disjoint_problem","Max-com-5-20.pdf"))
+
+
+
+savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver D=",string(nD)," N=",string(nN),".pdf")))
+savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver D=",string(nD)," N=",string(nN),".pdf")))
+savefig(figJ, joinpath("media","figs","disjoint_problem",string("DJ-Cost-Conver D=",string(nD)," N=",string(nN),".pdf")))
 
 
 
