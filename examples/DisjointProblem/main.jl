@@ -43,7 +43,7 @@ figJ = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xl
 
 
 
-@time for tp in 1:nTestTopo
+for tp in 1:nTestTopo
     println("Solving topology $tp")
 
     global countID = 0
@@ -90,9 +90,9 @@ figJ = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xl
     println()
 end
 
-savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver D=",string(nD),"-N=",string(nN),".pdf")))
-savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver D=",string(nD),"-N=",string(nN),".pdf")))
-savefig(figJ, joinpath("media","figs","disjoint_problem",string("DJ-Cost-Conver D=",string(nD),"-N=",string(nN),".pdf")))
+savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
+savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
+savefig(figJ, joinpath("media","figs","disjoint_problem",string("DJ-Cost-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
 
 medstep = Dict()
 for (key, value) in node_iter
