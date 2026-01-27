@@ -29,49 +29,64 @@ function grad_cost_root(x; para)
     return x .- para[1]
 end
 
-function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
-    global countID
+# function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
+#     global countID
 
-    if nL == 1
-        num_child = nN
-    else
-        # nc = Int(round(nN/nL))
-        nc = nN - nL
-        num_child = rand(1:max(nc,1))
-    end
+#     if nL == 1
+#         num_child = nN
+#     else
+#         # nc = Int(round(nN/nL))
+#         nc = nN - nL
+#         num_child = rand(1:max(nc,1))
+#     end
 
-    children = [linknode(string(countID+=1)) for i in 1:num_child]
-    set_relative!(node, children)
+#     children = [linknode(string(countID+=1)) for i in 1:num_child]
+#     set_relative!(node, children)
 
-    res_alloc = nN - num_child
+#     res_alloc = nN - num_child
 
-    arr_alloc = Vector{Int64}(zeros(num_child))
+#     arr_alloc = Vector{Int64}(zeros(num_child))
 
-    if res_alloc > 0
-        d = rand(1:num_child)
-        arr_alloc[d] = rand(min(nL-1,res_alloc):max(nL-1, res_alloc)) #make sure reaching the deepest level
-        res_alloc -= arr_alloc[d]
+#     if res_alloc > 0
+#         d = rand(1:num_child)
+#         arr_alloc[d] = rand(min(nL-1,res_alloc):max(nL-1, res_alloc)) #make sure reaching the deepest level
+#         res_alloc -= arr_alloc[d]
 
-        for i in 1:num_child
-            if i !== d      
-                arr_alloc[i] = rand(1:max(1,res_alloc))
-                res_alloc   -= arr_alloc[i]
-            end
+#         for i in 1:num_child
+#             if i !== d      
+#                 arr_alloc[i] = rand(1:max(1,res_alloc))
+#                 res_alloc   -= arr_alloc[i]
+#             end
 
-            if res_alloc <= 0
-                break
-            end
-        end
+#             if res_alloc <= 0
+#                 break
+#             end
+#         end
 
-        if res_alloc > 0
-            arr_alloc[rand(1:end)] += res_alloc
-        end
+#         if res_alloc > 0
+#             arr_alloc[rand(1:end)] += res_alloc
+#         end
 
-        for i in 1:num_child
-            if nL - 1 > 0 && arr_alloc[i] > 0
-                topo_gen!(children[i], arr_alloc[i], nL-1, depth+1)
-            end
-        end
+#         for i in 1:num_child
+#             if nL - 1 > 0 && arr_alloc[i] > 0
+#                 topo_gen!(children[i], arr_alloc[i], nL-1, depth+1)
+#             end
+#         end
+#     end
+# end
+
+
+function topo_gen!(node::linknode, node_config::Vector{Vector{String}})
+    nL = length(node_config)
+
+    for i in 1:nL
+        par   = node_config[i][1]
+        ID    = node_config[i][2]
+        child = linknode(string(ID))
+
+        parent = linknode[]
+        get_node!(node, par, parent)
+        set_relative!(parent[1], child)
     end
 end
 

@@ -75,6 +75,21 @@ function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
 end
 
 
+function topo_gen!(node::linknode, node_config::Vector{Vector{String}})
+    nL = length(node_config)
+
+    for i in 1:nL
+        par   = node_config[i][1]
+        ID    = node_config[i][2]
+        child = linknode(string(ID))
+
+        parent = linknode[]
+        get_node!(node, par, parent)
+        set_relative!(parent[1], child)
+    end
+end
+
+
 # for specail casese #variables = #dual = #prime (no local variables)
 function assign!(node::linknode)
     node.com_cost = 0

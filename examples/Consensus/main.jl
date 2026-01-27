@@ -21,8 +21,8 @@ include("CentralizedSolver.jl")
 include("ConvergeRateConsensus.jl")
 
 
-const nN   = 15
-const nD   = 4
+const nN   = 8
+const nD   = 3
 
 const λₙ   = 1.
 const λₕ   = 1.

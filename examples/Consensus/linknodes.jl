@@ -240,3 +240,16 @@ function com_iter!(node::linknode, total::Dict, max_num::Dict)
         end
     end
 end
+
+function get_node!(node::linknode, ID::String, result::Vector{linknode})
+
+    if node.ID == ID
+        push!(result, node)
+    else
+        if node.children !== nothing
+            for child in node.children
+                get_node!(child, ID, result)
+            end
+        end
+    end
+end

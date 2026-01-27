@@ -17,11 +17,11 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 10
+const nN   = 20
 const nD   = 3
 
-const λₙ   = 10e-3
-const λₕ   = 8e-3
+const λₙ   = 2e-3
+const λₕ   = 2e-3
 const tol  = 1e-4
 const max_iter = 1000
 

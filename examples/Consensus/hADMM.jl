@@ -90,7 +90,7 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
 end
 
 
-function hADMM(root::linknode, opt_sol; tol = tol, λ = λₕ, max_iter = max_iter)
+function hADMM(root::linknode, opt_sol; tol = tol, max_iter = max_iter)
     global stop_arr
     
     traj_err = Float64[]
@@ -113,8 +113,69 @@ function hADMM(root::linknode, opt_sol; tol = tol, λ = λₕ, max_iter = max_it
         end
     end
 
-    return traj_err, traj_res, opt_value
+    return traj_err, traj_res, opt_value, max_iter
 end
+
+
+
+function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Float64}, V::Vector{Float64})
+
+    node.iteration += 1
+    
+    #Update prime
+    proxAlg!(node)
+
+    y = vec_dual(node) - vec_dual(opt_node)
+    x = node.prime     - opt_node.prime
+
+    V[1] += λₕ*dot(y, y) + (1/λₕ + σ)*dot(x, x)
+
+    if node.children !== nothing
+        for (child, child_opt) in zip(node.children, opt_node.children)
+            hierarchicalADMM_V!(child, child_opt, ter, V)
+            #Update dual
+            res = node.prime - child.prime
+            node.dual[child.ID] += res
+
+            # Child sent its prime var to node
+            com_cost!(child, child.prime, 1)
+
+            #Take the maximum residual error for stopping criteria
+            push!(ter, maximum(abs.(res)))
+        end
+    end
+end
+
+function vec_dual(node::linknode)
+    y = Float64[]
+    if node.children !== nothing
+        for child in node.children
+            y = vcat(y, node.dual[child.ID])
+        end
+    end
+    return y
+end
+
+
+function hADMM_V(root::linknode, opt_root::linknode; tol = tol, max_iter = max_iter)
+    global stop_arr
+    
+    V_traj = Float64[]
+    
+    for iteration in 1:max_iter
+        V   = [0.]
+        ter = Float64[]
+        hierarchicalADMM_V!(root, opt_root, ter, V)
+        println(V)
+        push!(V_traj, V[1])
+
+        if maximum(ter) < tol
+            return V_traj
+        end
+    end
+end
+
+
 
 function get_err!(node::linknode, opt_sol, err::Vector{Float64})
     if node.children === nothing

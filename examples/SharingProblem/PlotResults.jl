@@ -3,7 +3,7 @@ fig1 = plot(framestyle = :box, size = (600,400), tickfont = tickfont, yticks = (
 fig2 = plot(framestyle = :box, size = (600,400), tickfont = tickfont, xlabel = "Number of iteration", guidefont = font(tickfont))
 
 
-plot!(fig1, 1:length(J_HADMM), (J_HADMM .- opt_cen)/maximum(J_HADMM .- opt_cen) , yscale = :log10, xlimit = [1, length(J_HADMM)], grid = true, label = "", linewidth = 3)
+plot!(fig1, 2:length(J_HADMM), (J_HADMM[2:end] .- opt_cen)/maximum(J_HADMM[2:end] .- opt_cen) , yscale = :log10, xlimit = [1, length(J_HADMM)], grid = true, label = "", linewidth = 3)
 plot!(fig2, 1:length(Res_arr), Res_arr, yscale = :log10, xlimit = [1, length(Res_arr)], grid = true, label = "", linewidth = 3)
 
 png(fig1, joinpath("code","HADMM-convergence","Figs","SP-Cost-Conver"))
