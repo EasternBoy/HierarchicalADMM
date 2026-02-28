@@ -21,10 +21,14 @@ max_iter3, max_com3, tt_com3 = network_data(5,20,31,21)
 color = Dict("hADMM"=> :blue, "fADMM"=> :green)
 
 tickfont = 16
+width = 2
+viol = true
 plt1 = plot(size = (400,600), tickfont = tickfont)
 for (key, value) in tt_com1
     if key !== "nADMM"
-        boxplot!(plt1, [key], value./100, label="", outliers = false)
+        x = fill(key, length(value))
+        if viol == true violin!(plt1, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
+        boxplot!(plt1, x, value./100, label="", outliers = false, linewidth = width)
         # dotplot!(plt1, [key], value./100, label="",markersize=3)
     end
 end
@@ -35,7 +39,9 @@ savefig(plt1,joinpath("media","figs","disjoint_problem","Tot-com-3-10.pdf"))
 plt2 = plot(size = (400,600), tickfont = tickfont, yticks = [10, 12, 14, 16, 18, 20])
 for (key, value) in tt_com2
     if key !== "nADMM"
-        boxplot!(plt2, [key], value./100, label="", outliers = false)
+        x = fill(key, length(value))
+        if viol == true violin!(plt2, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
+        boxplot!(plt2, x, value./100, label="", outliers = false, linewidth = width)
         # dotplot!(plt2, [key], value, label="",markersize=3)
     end
 end
@@ -45,7 +51,9 @@ savefig(plt2,joinpath("media","figs","disjoint_problem","Tot-com-3-20.pdf"))
 plt3 = plot(size = (400,600), tickfont = tickfont)
 for (key, value) in tt_com3
     if key !== "nADMM"
-        boxplot!(plt3, [key], value./100, label="", outliers = false)
+        x = fill(key, length(value))
+        if viol == true violin!(plt3, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
+        boxplot!(plt3, [key], value./100, label="", outliers = false, linewidth = width)
         # dotplot!(plt3, [key], value, label="",markersize=3)
     end
 end
@@ -56,8 +64,9 @@ savefig(plt3,joinpath("media","figs","disjoint_problem","Tot-com-5-20.pdf"))
 plt4 = plot(size = (400,600),  tickfont = tickfont)
 for (key, value) in max_com1
     if key !== "nADMM"
-    boxplot!(plt4, [key], value/100, label="", outliers = false)
-    # dotplot!(plt4, [key], value, label="", markersize=3)
+        x = fill(key, length(value))
+        if viol == true violin!(plt4, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
+        boxplot!(plt4, [key], value/100, label="", outliers = false, linewidth = width)
     end
 end
 annotate!((0, ylims(plt4)[2], text("×100", :left, tickfont)))
@@ -66,8 +75,9 @@ savefig(plt4,joinpath("media","figs","disjoint_problem","Max-com-3-10.pdf"))
 plt5 = plot(size = (400,600),  tickfont = tickfont)
 for (key, value) in max_com2
     if key !== "nADMM"
-    boxplot!(plt5, [key], value/100, label="", outliers = false)
-    # dotplot!(plt5, [key], value, label="", markersize=3)
+        x = fill(key, length(value))
+        if viol == true violin!(plt5, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
+        boxplot!(plt5, [key], value/100, label="", outliers = false, linewidth = width)
     end
 end
 annotate!((0, ylims(plt5)[2], text("×100", :left, tickfont)))
@@ -76,8 +86,9 @@ savefig(plt5,joinpath("media","figs","disjoint_problem","Max-com-3-20.pdf"))
 plt6 = plot(size = (400,600),  tickfont = tickfont)
 for (key, value) in max_com3
     if key !== "nADMM"
-    boxplot!(plt6, [key], value/100, label="", outliers = false)
-    # dotplot!(plt6, [key], value, label="",markersize=3)
+        x = fill(key, length(value))
+        if viol == true violin!(plt6, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
+        boxplot!(plt6, [key], value/100, label="", outliers = false, linewidth = width)
     end
 end
 annotate!((0, ylims(plt6)[2], text("×100", :left, tickfont)))
@@ -85,9 +96,9 @@ savefig(plt6,joinpath("media","figs","disjoint_problem","Max-com-5-20.pdf"))
 
 
 
-savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
-savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
-savefig(figJ, joinpath("media","figs","disjoint_problem",string("DJ-Cost-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
+# savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
+# savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
+# savefig(figJ, joinpath("media","figs","disjoint_problem",string("DJ-Cost-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
 
 
 

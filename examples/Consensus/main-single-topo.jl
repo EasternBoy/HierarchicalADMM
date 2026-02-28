@@ -94,6 +94,7 @@ opt_sol, opt_value = get_CenVars(root)
 print_tree(root)
 
 
+λₕ = 1.
 ## Hierarchical ADMM
 reset!(root)
 traj_err, traj_res, traj_opt, itr_num = hADMM(root, opt_sol)
@@ -105,8 +106,8 @@ opt_root = deepcopy(root)
 reset!(root)
 V_traj = hADMM_V(root, opt_root)
 
-fig  = plot!(1:length(V_traj),V_traj, yscale = :log10, label = string("γ⋆=",rate_best), 
-                                    tickfont = font(14), yticks = [1e2, 1, 1e-2, 1e-4, 1e-6], framestyle = :box, legendfont = font(14), size = (600,300), ylims = [1e-6, 2e2])
+fig  = plot!(1:length(V_traj),V_traj, yscale = :log10, label = string("Topology 2"), linewidth = 2,
+                                    tickfont = font(14), yticks = [1e2, 1, 1e-2, 1e-4, 1e-6], framestyle = :box, legendfont = font(14), size = (600,300))
 savefig(fig, joinpath("media","figs","consensus_problem",string("rate=",string(round(rate_best, digits = 3)),"-V_trajectory_hADMM.pdf")))
 
 

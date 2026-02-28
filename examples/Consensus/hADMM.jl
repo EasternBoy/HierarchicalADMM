@@ -118,7 +118,7 @@ end
 
 
 
-function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Float64}, V::Vector{Float64})
+function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Float64}, V::Vector{Float64}; λₕ::Float64 = 1.)
 
     node.iteration += 1
     
@@ -132,7 +132,7 @@ function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Flo
 
     if node.children !== nothing
         for (child, child_opt) in zip(node.children, opt_node.children)
-            hierarchicalADMM_V!(child, child_opt, ter, V)
+            hierarchicalADMM_V!(child, child_opt, ter, V; λₕ = λₕ)
             #Update dual
             res = node.prime - child.prime
             node.dual[child.ID] += res
@@ -157,7 +157,7 @@ function vec_dual(node::linknode)
 end
 
 
-function hADMM_V(root::linknode, opt_root::linknode; tol = tol, max_iter = max_iter)
+function hADMM_V(root::linknode, opt_root::linknode; λ = 1., tol = tol, max_iter = max_iter)
     global stop_arr
     
     V_traj = Float64[]
@@ -165,7 +165,7 @@ function hADMM_V(root::linknode, opt_root::linknode; tol = tol, max_iter = max_i
     for iteration in 1:max_iter
         V   = [0.]
         ter = Float64[]
-        hierarchicalADMM_V!(root, opt_root, ter, V)
+        hierarchicalADMM_V!(root, opt_root, ter, V; λₕ = λₕ)
         println(V)
         push!(V_traj, V[1])
 
