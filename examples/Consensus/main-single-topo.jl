@@ -51,7 +51,7 @@ root = linknode(string(countID+=1))
 network_config = [["1", "2"], ["2", "3"], ["2", "4"], ["2", "5"],
                               ["2", "6"], ["2", "7"], ["2", "8"]]
 ρ  = 0.1
-λₕ = 1/ρ
+const λₕ = 1/ρ
 σ  = 0.22
 rate_best = 0.0208                            
 
@@ -93,8 +93,6 @@ opt_sol, opt_value = get_CenVars(root)
 
 print_tree(root)
 
-
-λₕ = 1.
 ## Hierarchical ADMM
 reset!(root)
 traj_err, traj_res, traj_opt, itr_num = hADMM(root, opt_sol)

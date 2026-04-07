@@ -82,13 +82,6 @@ global mat_data = zeros(1, 5)
     traj_err, traj_res, traj_opt, itr_num = hADMM(root, opt_sol)
     push!(topo_arr, deepcopy(root))
     total, max_num = tt_com_iter(root)
-
-    # g = Graph(nN)
-    # add_edge_graph!(root, g)
-    # fig = graphplot(g, method=:tree)
-    # annotate!(fig, 0.5, 0.5, text(string("Conv. rate =",rate_best), 12, :black))
-    # display(fig)
-    # png(fig, joinpath("code","HADMM-convergence","Figs",string("topo",tp,"-",rate_best)))
     begin
         rate_best = -Inf
         σbest = 0
@@ -118,6 +111,14 @@ global mat_data = zeros(1, 5)
             max_level = 0
             dep_max_level = 0
         end
+
+
+        g = Graph(nN)
+        add_edge_graph!(root, g)
+        fig = graphplot(g, method=:tree)
+        annotate!(fig, 0.5, 0.5, text(string("Conv. rate =",rate_best), 12, :black))
+        display(fig)
+        png(fig, joinpath("media","figs",string("topo",tp,"-",rate_best)))
 
         # println(num_cong," ", max_level," ", dep_max_level," ", rate_best, " ", itr_num)
 
