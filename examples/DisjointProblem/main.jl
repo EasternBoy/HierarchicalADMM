@@ -1,7 +1,7 @@
 import Pkg
 
 Pkg.activate(".")
-# Pkg.instantiate()
+Pkg.instantiate()
 
 using Pkg, Plots, Graphs, GraphRecipes, NPZ, Statistics
 using LinearAlgebra, JuMP, Ipopt
@@ -17,7 +17,7 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 20
+const nN   = 30
 const nD   = 3
 
 const λₙ   = 2e-3
@@ -34,7 +34,7 @@ max_com    = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 topo_arr = linknode[]
 
 
-nTestTopo = 1000
+nTestTopo = 10
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
@@ -47,10 +47,19 @@ for tp in 1:nTestTopo
     println("Solving topology $tp")
 
     global countID = 0
+    k = rand(2:min(nN - 1, 5))
+    println("k = ", k)
 
     root = linknode(string(countID+=1))
 
-    topo_gen!(root, nN-1, nD-1) # first layer and node are root
+    topo_gen!(root, nN-1, nD-1, mode = :unbalanced, k = k)
+
+    g_topo = Graph(nN)
+    add_edge_graph!(root, g_topo)
+    fig_topo = graphplot(g_topo, method = :tree)
+    annotate!(fig_topo, 0.5, 0.5, text(string("Topology ", tp), 12, :black))
+    savefig(fig_topo, joinpath("media", "figs", "disjoint_problem",
+        string("Topology-", tp, "-D=", nD, "-N=", nN, ".pdf")))
 
     #Only for disjoint problem
     assign!(root) 
@@ -59,8 +68,9 @@ for tp in 1:nTestTopo
     ## Hierarchical ADMM
     reset!(root)
     traj_err, traj_res, traj_opt = hADMM(root, dict_result)
-    push!(topo_arr, deepcopy(root))
     total, max_num = tt_com_iter(root)
+    println("hADMM: obj = ", total_cost(root), ", total com = ", total["com"], ", root com = ", root.com_cost)
+    push!(topo_arr, deepcopy(root))
 
     push!(node_iter["hADMM"], max_num["iter"])
     push!(max_com["hADMM"],   max_num["com"])
@@ -76,6 +86,7 @@ for tp in 1:nTestTopo
     reset!(root)  #Reset variables
     nestedADMM!(root)
     total, max_num = tt_com_iter(root)
+    println("nADMM: obj = ", total_cost(root), ", total com = ", total["com"], ", root com = ", root.com_cost)
     push!(node_iter["nADMM"], max_num["iter"])
     push!(max_com["nADMM"],   max_num["com"])
     push!(tt_com["nADMM"],    total["com"])    
@@ -84,6 +95,7 @@ for tp in 1:nTestTopo
     reset!(root)  #Reset variables
     flattenADMM(root)
     total, max_num = tt_com_iter(root)
+    println("fADMM: obj = ", total_cost(root), ", total com = ", total["com"], ", root com = ", root.com_cost)
     push!(node_iter["fADMM"], max_num["iter"])
     push!(max_com["fADMM"],   max_num["com"])
     push!(tt_com["fADMM"],    total["com"])
@@ -120,6 +132,9 @@ npzwrite(joinpath("data","disjoint-problem",string("Max-iter-D=",nD,"-N=",nN,"-h
 npzwrite(joinpath("data","disjoint-problem",string("Max-com-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=", Int(round(medstep["fADMM"])),".npz")), max_com)
 npzwrite(joinpath("data","disjoint-problem",string("Tot-com-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=", Int(round(medstep["fADMM"])),".npz")), tt_com)
 
+least_iter, least_index = findmin(node_iter["hADMM"])
+most_iter, most_index = findmax(node_iter["hADMM"])
+
 # println("Fastest Convergence Topology $least_index after $least_iter steps")
 # print_tree(topo_arr[least_index])
 
@@ -128,8 +143,10 @@ npzwrite(joinpath("data","disjoint-problem",string("Tot-com-D=",nD,"-N=",nN,"-h=
 
 # g1 = Graph(nN)
 # add_edge_graph!(topo_arr[least_index], g1)
-# display(graphplot(g1, method=:tree))
+# p1 = graphplot(g1, method = :tree, title = "Fastest Topology")
+# savefig(p1, joinpath("media", "figs", "disjoint_problem", string("Fastest-Topology-D=", nD, "-N=", nN, ".pdf")))
 
 # g2 = Graph(nN)
 # add_edge_graph!(topo_arr[most_index], g2)
-# display(graphplot(g2, method=:tree))
+# p2 = graphplot(g2, method = :tree, title = "Slowest Topology")
+# savefig(p2, joinpath("media", "figs", "disjoint_problem", string("Slowest-Topology-D=", nD, "-N=", nN, ".pdf")))

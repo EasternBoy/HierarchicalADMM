@@ -1,4 +1,5 @@
 include("../../src/linknodes.jl")
+using Random: shuffle!
 
 # Define cost function and its gradient for each type of node
 ## Leaf nodes
@@ -28,51 +29,97 @@ function grad_cost_root(x; para)
     return 2*(x .- para[1])*dot(x .- para[1], x .- para[1])
 end
 
-function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
-    global countID
 
-    if nL == 1
-        num_child = nN
-    else
-        nc = Int(round(nN/nL))
-        num_child = rand(1:max(nc,1))
+function choose_num_children(nN:: Int, nL::Int, mode::Symbol, k::Int)
+    if nN <= 0
+        return 0
+    elseif mode == :balanced && nL <= 1
+        return nN
     end
 
-    children = [linknode(string(countID+=1)) for i in 1:num_child]
+    if mode == :balanced 
+        return min(k, nN)
+    elseif mode == :unbalanced
+        if nN == 1
+            return 1
+        end
+        return rand(2:min(k, nN))
+    else
+        error("Invalid mode. Please choose either :balanced or :unbalanced.")
+    end
+end
+
+function allocate_subtree_sizes(n_remain::Int, num_child::Int, mode::Symbol, k::Int)
+    alloc = zeros(Int, num_child)
+
+    if n_remain <= 0 || num_child == 0
+        return alloc
+    end
+
+    if mode == :balanced
+        base = div(n_remain, num_child)
+        extra = rem(n_remain, num_child)
+
+        for i in 1:num_child
+            alloc[i] = base
+        end
+        for i in 1:extra
+            alloc[i] += 1
+        end
+
+    elseif mode == :unbalanced
+        deep_idx = rand(1:num_child)
+
+        max_side = min(num_child - 1, n_remain ÷ k)
+        side_budget = max_side > 0 ? rand(0:max_side) : 0
+
+        side_candidates = [i for i in 1:num_child if i != deep_idx]
+        shuffle!(side_candidates)
+
+        for i in 1:side_budget
+            alloc[side_candidates[i]] = 1
+        end
+
+        alloc[deep_idx] = n_remain - side_budget
+    else
+        error("Unknown mode: $mode")
+    end
+
+    return alloc
+end
+
+function topo_gen!(node::linknode, nN::Int, nL::Int; mode::Symbol = :balanced, k::Int = 2, depth::Int = 1)
+    global countID
+
+    if mode == :balanced
+        if nN <= 0 || nL <= 0
+            return
+        end
+    elseif mode == :unbalanced
+        if nN <= 0
+            return
+        end
+    else
+        error("Unknown mode: $mode")
+    end
+
+    num_child = choose_num_children(nN, nL, mode, k)
+    children = [linknode(string(countID += 1)) for _ in 1:num_child]
     set_relative!(node, children)
 
-    res_alloc = nN - num_child
+    n_remain = nN - num_child
+    alloc = allocate_subtree_sizes(n_remain, num_child, mode, k)
 
-    arr_alloc = Vector{Int64}(zeros(num_child))
-
-    if res_alloc > 0
-        d = rand(1:num_child)
-        arr_alloc[d] = rand(min(nL-1,res_alloc):max(nL-1, Int(round(res_alloc/(nL-1))))) #make sure reaching the deepest level
-        res_alloc -= arr_alloc[d]
-
-        for i in 1:num_child
-            if i !== d      
-                arr_alloc[i] = rand(1:max(1,Int(round(res_alloc/(nL-1)))))
-                res_alloc   -= arr_alloc[i]
-            end
-
-            if res_alloc <= 0
-                break
-            end
-        end
-
-        if res_alloc > 0
-            arr_alloc[rand(1:end)] += res_alloc
-        end
-
-        for i in 1:num_child
-            if nL - 1 > 0 && arr_alloc[i] > 0
-                topo_gen!(children[i], arr_alloc[i], nL-1, depth+1)
+    for i in 1:num_child
+        if alloc[i] > 0
+            if mode == :balanced
+                topo_gen!(children[i], alloc[i], nL - 1; mode = mode, k = k, depth = depth + 1)
+            else
+                topo_gen!(children[i], alloc[i], nL; mode = mode, k = k, depth = depth + 1)
             end
         end
     end
 end
-
 
 # for specail casese #variables = #dual = #prime (no local variables)
 function assign!(node::linknode)

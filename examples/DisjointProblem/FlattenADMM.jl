@@ -106,6 +106,28 @@ function get_postion(path::Vector{linknode})
     return start_index
 end
 
+function assign_flat_solution!(node::linknode, dict_prime_child::Dict)
+    if node.children === nothing
+        node.prime[node.ID] = dict_prime_child[node.ID]
+        return
+    end
+
+    local_solution = dict_prime_child[node.ID]
+    index = 1
+    for child in node.children
+        node.prime[child.ID] = local_solution[index:index + child.nV - 1]
+        index += child.nV
+        assign_flat_solution!(child, dict_prime_child)
+    end
+end
+
+function write_flat_solution!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict)
+    for child in root.children
+        root.prime[child.ID] = dict_prime_root[child.ID]
+        assign_flat_solution!(child, dict_prime_child)
+    end
+end
+
 
 
 function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
@@ -164,6 +186,8 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
             break
         end
     end
+
+    write_flat_solution!(root, dict_prime_root, dict_prime_child)
 
     return dict_prime_root
 end
