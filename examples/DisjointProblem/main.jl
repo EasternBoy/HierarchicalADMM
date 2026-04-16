@@ -17,8 +17,8 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 30
-const nD   = 3
+const nN   = 20
+const nD   = 5
 
 const λₙ   = 2e-3
 const λₕ   = 2e-3
@@ -30,6 +30,7 @@ global countID
 node_iter  = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 tt_com     = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 max_com    = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
+root_com   = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 
 topo_arr = linknode[]
 
@@ -75,6 +76,7 @@ for tp in 1:nTestTopo
     push!(node_iter["hADMM"], max_num["iter"])
     push!(max_com["hADMM"],   max_num["com"])
     push!(tt_com["hADMM"],    total["com"])
+    push!(root_com["hADMM"],  root.com_cost)
 
     plot!(figPrime, 1:length(traj_err), traj_err, yscale = :log10, grid = true, label = "")
     plot!(figRes, 1:length(traj_res), traj_res, yscale = :log10, grid = true, label = "")
@@ -89,7 +91,8 @@ for tp in 1:nTestTopo
     println("nADMM: obj = ", total_cost(root), ", total com = ", total["com"], ", root com = ", root.com_cost)
     push!(node_iter["nADMM"], max_num["iter"])
     push!(max_com["nADMM"],   max_num["com"])
-    push!(tt_com["nADMM"],    total["com"])    
+    push!(tt_com["nADMM"],    total["com"])
+    push!(root_com["nADMM"],  root.com_cost)
 
     ## Flatten ADMM
     reset!(root)  #Reset variables
@@ -99,6 +102,7 @@ for tp in 1:nTestTopo
     push!(node_iter["fADMM"], max_num["iter"])
     push!(max_com["fADMM"],   max_num["com"])
     push!(tt_com["fADMM"],    total["com"])
+    push!(root_com["fADMM"],  root.com_cost)
     println()
 end
 
@@ -119,6 +123,13 @@ for (key, value) in max_com
     min_value, min_index = findmin(value)
     max_value, max_index = findmax(value)
     println("$key Maximum number of scalar variables sent by a node (min) avg. (max): ($min_value) $med ($max_value)")
+end
+println()
+for (key, value) in root_com
+    med = round(median(value))
+    min_value, min_index = findmin(value)
+    max_value, max_index = findmax(value)
+    println("$key Root node communication (min) avg. (max): ($min_value) $med ($max_value)")
 end
 println()
 for (key, value) in tt_com
