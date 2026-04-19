@@ -136,6 +136,7 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
     dict_prime_child = Dict()
     dict_prime_root  = Dict()
     dict_dual        = Dict()
+    last_dual        = Dict{String, Float64}()
     
     flatten_tree = Dict()
     collect_nodes!(root, flatten_tree)
@@ -161,8 +162,15 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
     for iteration in 1:max_iter
 
         root.iteration += 1 #Add 1 iteration in root
+        prev_prime_root = Dict{Any, Any}()
+        for (key, value) in dict_prime_root
+            prev_prime_root[key] = copy(value)
+        end
 
         update_root_flat!(root, dict_prime_root, dict_prime_child, dict_dual, pos, nV)
+        for (key, value) in dict_prime_root
+            last_dual[key] = maximum(abs.(value - prev_prime_root[key]))
+        end
 
         ter = Float64[]
         # Iterate through the nodes to solve the optimization problem
@@ -189,5 +197,5 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
 
     write_flat_solution!(root, dict_prime_root, dict_prime_child)
 
-    return dict_prime_root
+    return dict_prime_root, last_dual
 end

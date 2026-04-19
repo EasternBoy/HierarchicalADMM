@@ -76,16 +76,25 @@ function proxAlg!(node::linknode; λ = λₕ)
 end
 
 
-function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
+function hierarchicalADMM!(node::linknode, ter::Vector{Float64}, last_dual::Dict{String, Float64})
 
     node.iteration += 1
-    
+
+    prev_primes = Dict{String, Vector{Float64}}()
+    if node.children !== nothing
+        for child in node.children
+            prev_primes[child.ID] = copy(node.prime[child.ID])
+        end
+    end
+
     #Update prime
     proxAlg!(node)
 
+    dual_res = 0.0
     if node.children !== nothing
         for child in node.children
-            hierarchicalADMM!(child, ter)
+            dual_res = max(dual_res, maximum(abs.(node.prime[child.ID] - prev_primes[child.ID])))
+            hierarchicalADMM!(child, ter, last_dual)
             #Update dual
             child_prime = vect_prime(child)
             res = node.prime[child.ID] - child_prime
@@ -98,6 +107,8 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
             push!(ter, maximum(abs.(res)))
         end
     end
+
+    last_dual[node.ID] = dual_res
 end
 
 
@@ -107,11 +118,12 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
     traj_err = Float64[]
     traj_res = Float64[]
     opt_value = Float64[]
+    last_dual = Dict{String, Float64}()
     
     for iteration in 1:max_iter
         ter = Float64[]
         push!(opt_value, total_cost(root))
-        hierarchicalADMM!(root, ter)
+        hierarchicalADMM!(root, ter, last_dual)
 
         err = Float64[]
         get_err!(root, dict_result, err)
@@ -120,11 +132,11 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
 
         if maximum(ter) < tol
             println("hADMM converged after $iteration iterations in root")
-            return traj_err, traj_res, opt_value
+            return traj_err, traj_res, opt_value, last_dual
         end
     end
 
-    return traj_err, traj_res, opt_value
+    return traj_err, traj_res, opt_value, last_dual
 end
 
 # function forward_hierarchicalADMM!(root::linknode; max_nlayer = 10)

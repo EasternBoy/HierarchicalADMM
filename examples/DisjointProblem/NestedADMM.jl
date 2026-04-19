@@ -55,7 +55,11 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
 end
 
 
-function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter)
+function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter, last_dual = nothing)
+
+    if last_dual === nothing
+        last_dual = Dict{String, Float64}()
+    end
 
     node.iteration += 1
 
@@ -63,6 +67,10 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
         for iteration in 1:max_iter 
 
             ter = Float64[]
+            prev_primes = Dict{String, Vector{Float64}}()
+            for child in node.children
+                prev_primes[child.ID] = copy(node.prime[child.ID])
+            end
 
             child_primes = Float64[] 
             for child in node.children
@@ -78,10 +86,12 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
                 com_cost!(node.parent, top_query, 1) # Parent sent top_query to node
             end
 
+            dual_res = 0.0
             for child in node.children
+                dual_res = max(dual_res, maximum(abs.(node.prime[child.ID] - prev_primes[child.ID])))
                 qToChi  = node.prime[child.ID] + node.dual[child.ID]
             
-                nestedADMM!(child, qToChi)
+                nestedADMM!(child, qToChi; tol = tol, max_iter = max_iter, last_dual = last_dual)
 
                 child_prime = vect_prime(child)
                 res = node.prime[child.ID] - child_prime
@@ -90,6 +100,8 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
 
                 com_cost!(child, child_prime, 1) #Child sent its prime variable to node
             end
+
+            last_dual[node.ID] = dual_res
 
             if maximum(abs.(ter)) < tol
                 if node.parent === nothing
@@ -102,5 +114,8 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
     else
         com_cost!(node.parent, top_query, 1)
         update_leaf!(node, top_query)
+        last_dual[node.ID] = 0.0
     end
+
+    return last_dual
 end
