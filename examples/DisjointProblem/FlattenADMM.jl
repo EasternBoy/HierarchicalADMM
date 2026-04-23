@@ -189,10 +189,10 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
             com_cost!(reverse(path[key]), dict_prime_child[key], 1) #Communication from child to root to compute dual variable located in root
         end
 
-        if maximum(ter) < tol
-            println("fADMM converged after $iteration iterations in root")
-            break
-        end
+        # if maximum(ter) < tol
+        #     println("fADMM converged after $iteration iterations in root")
+        #     break
+        # end
     end
 
     write_flat_solution!(root, dict_prime_root, dict_prime_child)

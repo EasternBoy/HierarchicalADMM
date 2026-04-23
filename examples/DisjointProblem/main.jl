@@ -6,6 +6,7 @@ Pkg.instantiate()
 using Pkg, Plots, Graphs, GraphRecipes, NPZ, Statistics
 using LinearAlgebra, JuMP, Ipopt
 using Printf
+using DelimitedFiles
 using Zygote
 using ProximalAlgorithms
 using ProximalOperators
@@ -19,7 +20,7 @@ include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
 const nN   = 20
-const nD   = 5
+const nD   = 1
 
 const λₙ   = 2e-3
 const λₕ   = 2e-3
@@ -117,6 +118,31 @@ function print_table(title::String, headers::Vector{String}, rows::Vector{Vector
     println(border)
 end
 
+function collect_topology_rows!(node::linknode, rows::Vector{NTuple{3, String}})
+    parent_id = node.parent === nothing ? "" : node.parent.ID
+    push!(rows, (node.ID, parent_id, string(node.parent === nothing)))
+
+    if node.children !== nothing
+        for child in node.children
+            collect_topology_rows!(child, rows)
+        end
+    end
+end
+
+function save_topology_csv(root::linknode, path::String)
+    mkpath(dirname(path))
+
+    rows = NTuple{3, String}[]
+    collect_topology_rows!(root, rows)
+
+    open(path, "w") do io
+        println(io, "node_id,parent_id,is_root")
+        for (node_id, parent_id, is_root) in rows
+            println(io, string(node_id, ",", parent_id, ",", is_root))
+        end
+    end
+end
+
 
 for tp in 1:nTestTopo
     println("Solving topology $tp")
@@ -128,6 +154,15 @@ for tp in 1:nTestTopo
     root = linknode(string(countID+=1))
 
     topo_gen!(root, nN-1, nD-1, mode = :unbalanced, k = k)
+
+    topo_csv_path = joinpath(
+        "data",
+        "disjoint-problem",
+        "topologies",
+        string("Topology-", tp, "-D=", nD, "-N=", nN, ".csv"),
+    )
+    save_topology_csv(root, topo_csv_path)
+    println("Saved topology to ", topo_csv_path)
 
     g_topo = Graph(nN)
     add_edge_graph!(root, g_topo)
@@ -212,9 +247,9 @@ for tp in 1:nTestTopo
     println()
 end
 
-savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
-savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
-savefig(figJ, joinpath("media","figs","disjoint_problem",string("DJ-Cost-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
+# savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
+# savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
+# savefig(figJ, joinpath("media","figs","disjoint_problem",string("DJ-Cost-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
 
 medstep = Dict(key => round(mean(value)) for (key, value) in node_iter)
 

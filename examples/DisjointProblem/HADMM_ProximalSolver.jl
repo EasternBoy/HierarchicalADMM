@@ -130,10 +130,10 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
         push!(traj_res, maximum(ter))
         push!(traj_err, sum(err))
 
-        if maximum(ter) < tol
-            println("hADMM converged after $iteration iterations in root")
-            return traj_err, traj_res, opt_value, last_dual
-        end
+        # if maximum(ter) < tol
+        #     println("hADMM converged after $iteration iterations in root")
+        #     return traj_err, traj_res, opt_value, last_dual
+        # end
     end
 
     return traj_err, traj_res, opt_value, last_dual
