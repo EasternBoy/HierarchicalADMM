@@ -190,7 +190,6 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
         end
 
         # if maximum(ter) < tol
-        #     println("fADMM converged after $iteration iterations in root")
         #     break
         # end
     end

@@ -24,7 +24,7 @@ const nD   = 1
 
 const λₙ   = 2e-3
 const λₕ   = 2e-3
-const tol  = 1e-6
+const tol  = 1e-5
 const max_iter = 1000
 
 global countID
@@ -186,7 +186,7 @@ for tp in 1:nTestTopo
     h_dres = max_dict_value(h_dual_map)
     push!(topo_arr, deepcopy(root))
 
-    push!(node_iter["hADMM"], max_num_h["iter"])
+    push!(node_iter["hADMM"], root.iteration)
     push!(max_com["hADMM"],   max_num_h["com"])
     push!(tt_com["hADMM"],    total_h["com"])
     push!(root_com["hADMM"],  root.com_cost)
@@ -224,7 +224,7 @@ for tp in 1:nTestTopo
     f_gap = abs(f_obj - opt_value) / max(abs(opt_value), eps(Float64))
     f_pres = max_primal_residual(root)
     f_dres = max_dict_value(f_dual_map)
-    push!(node_iter["fADMM"], max_num_f["iter"])
+    push!(node_iter["fADMM"], root.iteration)
     push!(max_com["fADMM"],   max_num_f["com"])
     push!(tt_com["fADMM"],    total_f["com"])
     push!(root_com["fADMM"],  root.com_cost)
