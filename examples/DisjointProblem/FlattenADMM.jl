@@ -106,9 +106,31 @@ function get_postion(path::Vector{linknode})
     return start_index
 end
 
+function assign_flat_solution!(node::linknode, dict_prime_child::Dict)
+    if node.children === nothing
+        node.prime[node.ID] = dict_prime_child[node.ID]
+        return
+    end
+
+    local_solution = dict_prime_child[node.ID]
+    index = 1
+    for child in node.children
+        node.prime[child.ID] = local_solution[index:index + child.nV - 1]
+        index += child.nV
+        assign_flat_solution!(child, dict_prime_child)
+    end
+end
+
+function write_flat_solution!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict)
+    for child in root.children
+        root.prime[child.ID] = dict_prime_root[child.ID]
+        assign_flat_solution!(child, dict_prime_child)
+    end
+end
 
 
-function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
+
+function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter, dict_result = nothing)
 
     # Flatten the tree structure into a list of nodes
     dict_prime_child = Dict()
@@ -132,8 +154,11 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
         nV[key]               = value.nV
     end
 
-    # println("nV = $nV")
-    # println("pos = $pos")
+    # Track trajectories
+    traj_err = Float64[]
+    traj_res = Float64[]
+    traj_opt = Float64[]
+    traj_com = Float64[]
 
     # Initialize the query vector
     for iteration in 1:max_iter
@@ -159,11 +184,28 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
             com_cost!(reverse(path[key]), dict_prime_child[key], 1) #Communication from child to root to compute dual variable located in root
         end
 
+        # Update the entire tree structure with the new solutions
+        write_flat_solution!(root, dict_prime_root, dict_prime_child)
+
+        # Track metrics AFTER updating all node.prime values
+        push!(traj_opt, total_cost(root))
+        push!(traj_res, maximum(ter))
+        
+        # Track total communication after this iteration
+        total, _ = tt_com_iter(root)
+        push!(traj_com, total["com"])
+        
+        if dict_result !== nothing
+            err = Float64[]
+            get_err!(root, dict_result, err)
+            push!(traj_err, sum(err))
+        end
+
         if maximum(ter) < tol
             println("fADMM converged after $iteration iterations in root")
             break
         end
     end
 
-    return dict_prime_root
+    return dict_prime_root, traj_err, traj_res, traj_opt, traj_com
 end

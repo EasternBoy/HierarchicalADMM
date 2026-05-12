@@ -55,7 +55,7 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
 end
 
 
-function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter)
+function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter, dict_result = nothing, traj_err = nothing, traj_res = nothing, traj_opt = nothing, traj_com = nothing)
 
     node.iteration += 1
 
@@ -81,7 +81,7 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
             for child in node.children
                 qToChi  = node.prime[child.ID] + node.dual[child.ID]
             
-                nestedADMM!(child, qToChi)
+                nestedADMM!(child, qToChi, traj_com=traj_com)
 
                 child_prime = vect_prime(child)
                 res = node.prime[child.ID] - child_prime
@@ -89,6 +89,21 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
                 append!(ter, res)
 
                 com_cost!(child, child_prime, 1) #Child sent its prime variable to node
+            end
+
+            # Track metrics for root node AFTER all updates
+            if node.parent === nothing && dict_result !== nothing && traj_err !== nothing && traj_res !== nothing && traj_opt !== nothing
+                push!(traj_opt, total_cost(node))
+                push!(traj_res, maximum(abs.(ter)))
+                err = Float64[]
+                get_err!(node, dict_result, err)
+                push!(traj_err, sum(err))
+                
+                # Track total communication after this iteration
+                if traj_com !== nothing
+                    total, _ = tt_com_iter(node)
+                    push!(traj_com, total["com"])
+                end
             end
 
             if maximum(abs.(ter)) < tol

@@ -3,13 +3,14 @@ import Pkg
 Pkg.activate(".")
 # Pkg.instantiate()
 
-using Pkg, Plots, Graphs, GraphRecipes, NPZ, Statistics
+using Pkg, Plots, Graphs, GraphRecipes, NPZ, Statistics, CSV, DataFrames
 using LinearAlgebra, JuMP, Ipopt
 using Zygote
 using ProximalAlgorithms
 using ProximalOperators
 using ProximalCore
 using DifferentiationInterface: AutoZygote
+using Printf
 
 include("TreeGeneration.jl")
 include("CentralSolution.jl")
@@ -30,18 +31,24 @@ global countID
 node_iter  = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 tt_com     = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 max_com    = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
+root_com   = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
+opt_gap    = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64[])
+primal_res = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64[])
+dual_res   = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64[])
+final_obj  = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64[])
 
 topo_arr = linknode[]
 
 
-nTestTopo = 1000
+nTestTopo = 5
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
 figRes = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
 figJ = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
 
-
+# Storage for all trajectories across topologies
+all_trajectories = DataFrame[]
 
 for tp in 1:nTestTopo
     println("Solving topology $tp")
@@ -58,37 +65,85 @@ for tp in 1:nTestTopo
 
     ## Hierarchical ADMM
     reset!(root)
-    traj_err, traj_res, traj_opt = hADMM(root, dict_result)
+    traj_err, traj_res, traj_opt, traj_com_h = hADMM(root, dict_result)
     push!(topo_arr, deepcopy(root))
+    
     total, max_num = tt_com_iter(root)
-
     push!(node_iter["hADMM"], max_num["iter"])
     push!(max_com["hADMM"],   max_num["com"])
     push!(tt_com["hADMM"],    total["com"])
+    push!(root_com["hADMM"],  max_num["com"])
+    push!(opt_gap["hADMM"],   abs(traj_opt[end] - opt_value) / abs(opt_value) * 100)
+    push!(primal_res["hADMM"], traj_err[end])
+    push!(dual_res["hADMM"],   traj_res[end])
+    push!(final_obj["hADMM"],  traj_opt[end])
 
     plot!(figPrime, 1:length(traj_err), traj_err, yscale = :log10, grid = true, label = "")
     plot!(figRes, 1:length(traj_res), traj_res, yscale = :log10, grid = true, label = "")
     plot!(figJ, 1:length(traj_opt), abs.(traj_opt .- opt_value)/maximum(abs.(traj_opt .- opt_value)), yscale = :log10, grid = true, label = "")
 
-    # print_tree(root)
-
     ## Nested ADMM
-    reset!(root)  #Reset variables
-    nestedADMM!(root)
+    reset!(root)
+    traj_err_n = Float64[]
+    traj_res_n = Float64[]
+    traj_opt_n = Float64[]
+    traj_com_n = Float64[]
+    nestedADMM!(root, 0., tol=tol, max_iter=max_iter, dict_result=dict_result, traj_err=traj_err_n, traj_res=traj_res_n, traj_opt=traj_opt_n, traj_com=traj_com_n)
+    
     total, max_num = tt_com_iter(root)
     push!(node_iter["nADMM"], max_num["iter"])
     push!(max_com["nADMM"],   max_num["com"])
-    push!(tt_com["nADMM"],    total["com"])    
+    push!(tt_com["nADMM"],    total["com"])
+    push!(root_com["nADMM"],  max_num["com"])
+    push!(opt_gap["nADMM"],   abs(traj_opt_n[end] - opt_value) / abs(opt_value) * 100)
+    push!(primal_res["nADMM"], traj_err_n[end])
+    push!(dual_res["nADMM"],   traj_res_n[end])
+    push!(final_obj["nADMM"],  traj_opt_n[end])
 
     ## Flatten ADMM
-    reset!(root)  #Reset variables
-    flattenADMM(root)
+    reset!(root)
+    dict_prime_root_f, traj_err_f, traj_res_f, traj_opt_f, traj_com_f = flattenADMM(root, tol=tol, λ=λₙ, max_iter=max_iter, dict_result=dict_result)
+    
     total, max_num = tt_com_iter(root)
     push!(node_iter["fADMM"], max_num["iter"])
     push!(max_com["fADMM"],   max_num["com"])
     push!(tt_com["fADMM"],    total["com"])
+    push!(root_com["fADMM"],  max_num["com"])
+    push!(opt_gap["fADMM"],   abs(traj_opt_f[end] - opt_value) / abs(opt_value) * 100)
+    push!(primal_res["fADMM"], traj_err_f[end])
+    push!(dual_res["fADMM"],   traj_res_f[end])
+    push!(final_obj["fADMM"],  traj_opt_f[end])
+    
+    # Create DataFrame for this topology's trajectories
+    max_len = max(length(traj_err), length(traj_err_n), length(traj_err_f))
+    
+    df = DataFrame(
+        topology = fill(tp, max_len),
+        iteration = 1:max_len,
+        hADMM_primal_error = vcat(traj_err, fill(missing, max_len - length(traj_err))),
+        hADMM_dual_residual = vcat(traj_res, fill(missing, max_len - length(traj_res))),
+        hADMM_objective = vcat(traj_opt, fill(missing, max_len - length(traj_opt))),
+        hADMM_total_communication = vcat(traj_com_h, fill(missing, max_len - length(traj_com_h))),
+        nADMM_primal_error = vcat(traj_err_n, fill(missing, max_len - length(traj_err_n))),
+        nADMM_dual_residual = vcat(traj_res_n, fill(missing, max_len - length(traj_res_n))),
+        nADMM_objective = vcat(traj_opt_n, fill(missing, max_len - length(traj_opt_n))),
+        nADMM_total_communication = vcat(traj_com_n, fill(missing, max_len - length(traj_com_n))),
+        fADMM_primal_error = vcat(traj_err_f, fill(missing, max_len - length(traj_err_f))),
+        fADMM_dual_residual = vcat(traj_res_f, fill(missing, max_len - length(traj_res_f))),
+        fADMM_objective = vcat(traj_opt_f, fill(missing, max_len - length(traj_opt_f))),
+        fADMM_total_communication = vcat(traj_com_f, fill(missing, max_len - length(traj_com_f))),
+        optimal_value = fill(opt_value, max_len)
+    )
+    
+    push!(all_trajectories, df)
     println()
 end
+
+# Combine all trajectories and save to CSV
+combined_trajectories = vcat(all_trajectories...)
+csv_filename = joinpath("data", "disjoint-problem", string("trajectories-D=", nD, "-N=", nN, ".csv"))
+CSV.write(csv_filename, combined_trajectories)
+println("\nTrajectories saved to: $csv_filename")
 
 savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
 savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
@@ -115,6 +170,87 @@ for (key, value) in tt_com
     max_value, max_index = findmax(value)
     println("$key Total number of scalar variables sent in network (min) avg. (max): ($min_value) $med ($max_value)")
 end
+
+# Function to print formatted summary statistics table
+function print_summary_table(metric_name::String, data_dict::Dict, format_func=x->string(round(Int, x)))
+    println("\n$metric_name")
+    println("+--------+$(repeat("-", 6))+$(repeat("-", 6))+$(repeat("-", 6))+")
+    println("| Metric | Min  | Mean | Max  |")
+    println("+--------+$(repeat("-", 6))+$(repeat("-", 6))+$(repeat("-", 6))+")
+    
+    for method in ["hADMM", "fADMM", "nADMM"]
+        if haskey(data_dict, method) && !isempty(data_dict[method])
+            min_val = minimum(data_dict[method])
+            mean_val = mean(data_dict[method])
+            max_val = maximum(data_dict[method])
+            
+            min_str = format_func(min_val)
+            mean_str = format_func(mean_val)
+            max_str = format_func(max_val)
+            
+            println("| $(rpad(method, 6)) | $(rpad(min_str, 4)) | $(rpad(mean_str, 4)) | $(rpad(max_str, 4)) |")
+        end
+    end
+    println("+--------+$(repeat("-", 6))+$(repeat("-", 6))+$(repeat("-", 6))+")
+end
+
+function print_summary_table_scientific(metric_name::String, data_dict::Dict)
+    println("\n$metric_name")
+    println("+--------+$(repeat("-", 11))+$(repeat("-", 11))+$(repeat("-", 11))+")
+    println("| Metric | Min       | Mean      | Max       |")
+    println("+--------+$(repeat("-", 11))+$(repeat("-", 11))+$(repeat("-", 11))+")
+    
+    for method in ["hADMM", "fADMM", "nADMM"]
+        if haskey(data_dict, method) && !isempty(data_dict[method])
+            min_val = minimum(data_dict[method])
+            mean_val = mean(data_dict[method])
+            max_val = maximum(data_dict[method])
+            
+            min_str = @sprintf("%.3e", min_val)
+            mean_str = @sprintf("%.3e", mean_val)
+            max_str = @sprintf("%.3e", max_val)
+            
+            println("| $(rpad(method, 6)) | $(rpad(min_str, 9)) | $(rpad(mean_str, 9)) | $(rpad(max_str, 9)) |")
+        end
+    end
+    println("+--------+$(repeat("-", 11))+$(repeat("-", 11))+$(repeat("-", 11))+")
+end
+
+function print_summary_table_decimal(metric_name::String, data_dict::Dict)
+    println("\n$metric_name")
+    println("+--------+$(repeat("-", 14))+$(repeat("-", 14))+$(repeat("-", 15))+")
+    println("| Metric | Min          | Mean         | Max           |")
+    println("+--------+$(repeat("-", 14))+$(repeat("-", 14))+$(repeat("-", 15))+")
+    
+    for method in ["hADMM", "fADMM", "nADMM"]
+        if haskey(data_dict, method) && !isempty(data_dict[method])
+            min_val = minimum(data_dict[method])
+            mean_val = mean(data_dict[method])
+            max_val = maximum(data_dict[method])
+            
+            min_str = @sprintf("%.6f", min_val)
+            mean_str = @sprintf("%.6f", mean_val)
+            max_str = @sprintf("%.6f", max_val)
+            
+            println("| $(rpad(method, 6)) | $(rpad(min_str, 12)) | $(rpad(mean_str, 12)) | $(rpad(max_str, 13)) |")
+        end
+    end
+    println("+--------+$(repeat("-", 14))+$(repeat("-", 14))+$(repeat("-", 15))+")
+end
+
+# Print summary statistics
+println("\n" * "="^80)
+println("SUMMARY STATISTICS")
+println("="^80)
+
+print_summary_table("Maximum Iterations per Node", node_iter)
+print_summary_table("Maximum Communication per Node", max_com)
+print_summary_table("Total Communication in Network", tt_com)
+print_summary_table("Root Node Communication", root_com)
+print_summary_table_scientific("Optimality Gap (%)", opt_gap)
+print_summary_table_scientific("Primal Residual", primal_res)
+print_summary_table_scientific("Dual Residual", dual_res)
+print_summary_table_decimal("Final Objective Value", final_obj)
 
 npzwrite(joinpath("data","disjoint-problem",string("Max-iter-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=",Int(round(medstep["fADMM"])),".npz")), node_iter)
 npzwrite(joinpath("data","disjoint-problem",string("Max-com-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=", Int(round(medstep["fADMM"])),".npz")), max_com)
