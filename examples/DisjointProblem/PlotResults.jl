@@ -23,7 +23,7 @@ end
 
 
 # max_iter1, max_com1, tt_com1 = network_data(3,20,21,17)
-max_iter2, max_com2, tt_com2 = network_data(3,20,22,17)
+max_iter2, max_com2, tt_com2 = network_data(3,30,58,35)
 # max_iter3, max_com3, tt_com3 = network_data(5,30,123,50)
 
 
@@ -109,15 +109,11 @@ function calculate_metrics(df, topo, alg, opt_val)
     topo_df = filter(row -> row.topology == topo, df)
     
     obj_col = Symbol(string(alg, "_objective"))
-    # Only filter for this specific algorithm's data
-    valid_idx = .!ismissing.(topo_df[!, obj_col])
-    
-    iters = topo_df.iteration[valid_idx]
-    obj_vals = collect(skipmissing(topo_df[!, obj_col]))
-    
-    # Calculate optimality gap (%)
+    # Lấy toàn bộ iteration và giá trị objective, kể cả missing
+    iters = topo_df.iteration
+    obj_vals = topo_df[!, obj_col]
+    # Tính optimality gap, giữ missing nếu có
     opt_gap = abs.(obj_vals .- opt_val) ./ abs(opt_val) .* 100
-    
     return iters, opt_gap
 end
 
@@ -126,12 +122,9 @@ function get_total_communication(df, topo, alg)
     topo_df = filter(row -> row.topology == topo, df)
     
     com_col = Symbol(string(alg, "_total_communication"))
-    # Only filter for this specific algorithm's data
-    valid_idx = .!ismissing.(topo_df[!, com_col])
-    
-    iters = topo_df.iteration[valid_idx]
-    total_com = collect(skipmissing(topo_df[!, com_col]))
-    
+    # Lấy toàn bộ iteration và giá trị communication, kể cả missing
+    iters = topo_df.iteration
+    total_com = topo_df[!, com_col]
     return iters, total_com
 end
 
@@ -150,55 +143,33 @@ function plot_trajectories(D, N)
     
     unique_topos = unique(df.topology)
     colors = [:blue, :green, :red, :purple, :orange, :cyan, :brown, :magenta, :black]
-    
-    # Plot for each algorithm with dual y-axes
     for alg in ["hADMM", "fADMM", "nADMM"]
-        # Create main plot for optimality gap (left y-axis)
         plt = plot(framestyle=:box, tickfont=14, guidefont=14, legendfontsize=8,
                    xlabel="Iteration", ylabel="Optimality Gap (%)",
                    yscale=:log10, legend=:topright, size=(800, 600))
-        
-        # Create twin axis for total communication (right y-axis)
         plt2 = twinx(plt)
         plot!(plt2, ylabel="Total Communication", tickfont=14, guidefont=14,
               yscale=:log10, legend=false)
-        
         for (i, topo) in enumerate(unique_topos)
             c = colors[mod1(i, length(colors))]
-            
-            # Get optimal value for this topology
-            topo_df = filter(row -> row.topology == topo, df)
-            if isempty(topo_df)
+            subdf = filter(row -> row.topology == topo && row.alg == alg, df)
+            if isempty(subdf)
                 continue
             end
-            opt_val = topo_df.optimal_value[1]
-            
-            # Calculate optimality gap
-            iters, opt_gap = calculate_metrics(df, topo, alg, opt_val)
-            
-            # Get total communication from CSV
-            _, total_com = get_total_communication(df, topo, alg)
-            
-            if !isempty(iters)
-                # Plot optimality gap on left axis
-                plot!(plt, iters, opt_gap, color=c, linewidth=2, alpha=0.7, 
-                      label="Topo $topo")
-                
-                # Plot total communication on right axis
-                plot!(plt2, iters, total_com, color=c, linewidth=2, alpha=0.7,
-                      label="")
-            end
+            opt_val = subdf.optimal_value[1]
+            iters = subdf.iteration
+            opt_gap = abs.(subdf.objective .- opt_val) ./ abs(opt_val) .* 100
+            total_com = subdf.total_communication
+            plot!(plt, iters, opt_gap, color=c, linewidth=2, alpha=0.7, label="Topo $topo")
+            plot!(plt2, iters, total_com, color=c, linewidth=2, alpha=0.7, label="")
         end
-        
-        # Save plot
         savefig(plt, joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem",
                 string("Trajectory-DualAxis-", alg, "-D=", D, "-N=", N, ".pdf")))
-        
         println("Saved dual-axis plot for $alg")
     end
 end
 
 # Generate trajectory plots
 println("\nGenerating trajectory plots from CSV...")
-plot_trajectories(3, 20)
+plot_trajectories(3, 30)
 println("\nAll plots generated successfully!")

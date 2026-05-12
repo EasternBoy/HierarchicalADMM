@@ -18,7 +18,7 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 20
+const nN   = 30
 const nD   = 3
 
 const λₙ   = 2e-3
@@ -89,7 +89,12 @@ for tp in 1:nTestTopo
     traj_opt_n = Float64[]
     traj_com_n = Float64[]
     nestedADMM!(root, 0., tol=tol, max_iter=max_iter, dict_result=dict_result, traj_err=traj_err_n, traj_res=traj_res_n, traj_opt=traj_opt_n, traj_com=traj_com_n)
-    
+    println("nADMM root node trajectory length: ", length(traj_opt_n))
+    # Đảm bảo traj_com_n có cùng độ dài với traj_opt_n (root node)
+    if length(traj_com_n) < length(traj_opt_n)
+        last_com = isempty(traj_com_n) ? 0.0 : traj_com_n[end]
+        append!(traj_com_n, fill(last_com, length(traj_opt_n) - length(traj_com_n)))
+    end
     total, max_num = tt_com_iter(root)
     push!(node_iter["nADMM"], max_num["iter"])
     push!(max_com["nADMM"],   max_num["com"])
@@ -114,27 +119,39 @@ for tp in 1:nTestTopo
     push!(dual_res["fADMM"],   traj_res_f[end])
     push!(final_obj["fADMM"],  traj_opt_f[end])
     
-    # Create DataFrame for this topology's trajectories
-    max_len = max(length(traj_err), length(traj_err_n), length(traj_err_f))
-    
-    df = DataFrame(
-        topology = fill(tp, max_len),
-        iteration = 1:max_len,
-        hADMM_primal_error = vcat(traj_err, fill(missing, max_len - length(traj_err))),
-        hADMM_dual_residual = vcat(traj_res, fill(missing, max_len - length(traj_res))),
-        hADMM_objective = vcat(traj_opt, fill(missing, max_len - length(traj_opt))),
-        hADMM_total_communication = vcat(traj_com_h, fill(missing, max_len - length(traj_com_h))),
-        nADMM_primal_error = vcat(traj_err_n, fill(missing, max_len - length(traj_err_n))),
-        nADMM_dual_residual = vcat(traj_res_n, fill(missing, max_len - length(traj_res_n))),
-        nADMM_objective = vcat(traj_opt_n, fill(missing, max_len - length(traj_opt_n))),
-        nADMM_total_communication = vcat(traj_com_n, fill(missing, max_len - length(traj_com_n))),
-        fADMM_primal_error = vcat(traj_err_f, fill(missing, max_len - length(traj_err_f))),
-        fADMM_dual_residual = vcat(traj_res_f, fill(missing, max_len - length(traj_res_f))),
-        fADMM_objective = vcat(traj_opt_f, fill(missing, max_len - length(traj_opt_f))),
-        fADMM_total_communication = vcat(traj_com_f, fill(missing, max_len - length(traj_com_f))),
-        optimal_value = fill(opt_value, max_len)
+    # Lưu từng DataFrame riêng cho từng thuật toán, sau đó nối dọc
+    df_hADMM = DataFrame(
+        topology = fill(tp, length(traj_err)),
+        iteration = 1:length(traj_err),
+        alg = fill("hADMM", length(traj_err)),
+        primal_error = traj_err,
+        dual_residual = traj_res,
+        objective = traj_opt,
+        total_communication = traj_com_h,
+        optimal_value = fill(opt_value, length(traj_err))
     )
-    
+    df_nADMM = DataFrame(
+        topology = fill(tp, length(traj_err_n)),
+        iteration = 1:length(traj_err_n),
+        alg = fill("nADMM", length(traj_err_n)),
+        primal_error = traj_err_n,
+        dual_residual = traj_res_n,
+        objective = traj_opt_n,
+        total_communication = traj_com_n,
+        optimal_value = fill(opt_value, length(traj_err_n))
+    )
+    df_fADMM = DataFrame(
+        topology = fill(tp, length(traj_err_f)),
+        iteration = 1:length(traj_err_f),
+        alg = fill("fADMM", length(traj_err_f)),
+        primal_error = traj_err_f,
+        dual_residual = traj_res_f,
+        objective = traj_opt_f,
+        total_communication = traj_com_f,
+        optimal_value = fill(opt_value, length(traj_err_f))
+    )
+    # Nối dọc các DataFrame này lại
+    df = vcat(df_hADMM, df_nADMM, df_fADMM)
     push!(all_trajectories, df)
     println()
 end
