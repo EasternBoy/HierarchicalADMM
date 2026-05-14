@@ -159,6 +159,7 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
     traj_res = Float64[]
     traj_opt = Float64[]
     traj_com = Float64[]
+    traj_root_com = Float64[]
 
     # Initialize the query vector
     for iteration in 1:max_iter
@@ -194,6 +195,7 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
         # Track total communication after this iteration
         total, _ = tt_com_iter(root)
         push!(traj_com, total["com"])
+        push!(traj_root_com, root.com_cost)
         
         if dict_result !== nothing
             err = Float64[]
@@ -207,5 +209,5 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
         end
     end
 
-    return dict_prime_root, traj_err, traj_res, traj_opt, traj_com
+    return dict_prime_root, traj_err, traj_res, traj_opt, traj_com, traj_root_com
 end

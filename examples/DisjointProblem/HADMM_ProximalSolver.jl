@@ -108,6 +108,7 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
     traj_res = Float64[]
     opt_value = Float64[]
     traj_com = Float64[]
+    traj_root_com = Float64[]
     
     for iteration in 1:max_iter
         ter = Float64[]
@@ -122,14 +123,15 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
         # Track total communication after this iteration
         total, _ = tt_com_iter(root)
         push!(traj_com, total["com"])
+        push!(traj_root_com, root.com_cost)
 
         if maximum(ter) < tol
             println("hADMM converged after $iteration iterations in root")
-            return traj_err, traj_res, opt_value, traj_com
+            return traj_err, traj_res, opt_value, traj_com, traj_root_com
         end
     end
 
-    return traj_err, traj_res, opt_value, traj_com
+    return traj_err, traj_res, opt_value, traj_com, traj_root_com
 end
 
 # function forward_hierarchicalADMM!(root::linknode; max_nlayer = 10)

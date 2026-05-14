@@ -55,7 +55,7 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
 end
 
 
-function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter, dict_result = nothing, traj_err = nothing, traj_res = nothing, traj_opt = nothing, traj_com = nothing)
+function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter, dict_result = nothing, traj_err = nothing, traj_res = nothing, traj_opt = nothing, traj_com = nothing, traj_root_com = nothing)
 
     node.iteration += 1
 
@@ -81,7 +81,7 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
             for child in node.children
                 qToChi  = node.prime[child.ID] + node.dual[child.ID]
             
-                nestedADMM!(child, qToChi, traj_com=traj_com)
+                nestedADMM!(child, qToChi, traj_com=traj_com, traj_root_com=traj_root_com)
 
                 child_prime = vect_prime(child)
                 res = node.prime[child.ID] - child_prime
@@ -103,6 +103,9 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
                 if traj_com !== nothing
                     total, _ = tt_com_iter(node)
                     push!(traj_com, total["com"])
+                end
+                if traj_root_com !== nothing
+                    push!(traj_root_com, node.com_cost)
                 end
             end
 

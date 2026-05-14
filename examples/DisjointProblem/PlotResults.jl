@@ -1,175 +1,226 @@
 import Pkg
 
 Pkg.activate(joinpath(@__DIR__, "..", ".."))
-using StatsPlots, NPZ, Plots, Statistics, CSV, DataFrames
 
+using CSV
+using DataFrames
+using Plots
+using Random
 
-function network_data(D, N, h, f)
-    f1 = joinpath(@__DIR__, "..", "..", "data","disjoint-problem",string("Max-iter-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz"))
-    f2 = joinpath(@__DIR__, "..", "..", "data","disjoint-problem",string("Max-com-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz"))
-    f3 = joinpath(@__DIR__, "..", "..", "data","disjoint-problem",string("Tot-com-D=",D,"-N=",N,"-h=",h,"-f=",f,".npz"))
+const nD = 5
+const nN = 30
+const N_TOPOLOGIES_TO_PLOT = 5
+const RNG_SEED = 2026
 
-    if !isfile(f1) || !isfile(f2) || !isfile(f3)
-        println("Warning: Missing .npz files for D=$D, N=$N, h=$h, f=$f")
-        return Dict(), Dict(), Dict()
+const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
+const FIG_DIR = joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem")
+const TRAJECTORY_FILE = joinpath(DATA_DIR, "trajectories-D=$(nD)-N=$(nN).csv")
+
+const ALG_ORDER = ["hADMM", "fADMM"]
+const ALG_LINESTYLE = Dict(
+    "nADMM" => :dash,
+    "hADMM" => :solid,
+    "fADMM" => :dot,
+)
+const ALG_MARKER = Dict(
+    "nADMM" => :none,
+    "hADMM" => :none,
+    "fADMM" => :none,
+)
+const TOPOLOGY_COLORS = [
+    :blue,
+    :red,
+    :green,
+    :orange,
+    :purple,
+    :brown,
+    :cyan,
+    :magenta,
+    :black,
+    :gray,
+]
+
+function sampled_topologies(df::DataFrame; n::Int = N_TOPOLOGIES_TO_PLOT, seed::Int = RNG_SEED)
+    topologies = sort(unique(df.topology))
+    rng = MersenneTwister(seed)
+    n_sample = min(n, length(topologies))
+    return sort(shuffle(rng, topologies)[1:n_sample])
+end
+
+function convergence_iterations(subdf::DataFrame)
+    final_root_iter = maximum(subdf.iteration)
+
+    if :maxnodeiters in propertynames(subdf)
+        final_iter_count = subdf.maxnodeiters[end]
+    else
+        final_iter_count = final_root_iter
     end
 
-    r1 = npzread(f1)
-    r2 = npzread(f2)
-    r3 = npzread(f3)
-
-    return r1,r2,r3    
+    return subdf.iteration .* final_iter_count ./ final_root_iter
 end
 
-
-# max_iter1, max_com1, tt_com1 = network_data(3,20,21,17)
-max_iter2, max_com2, tt_com2 = network_data(3,30,58,35)
-# max_iter3, max_com3, tt_com3 = network_data(5,30,123,50)
-
-
-color = Dict("hADMM"=> :blue, "fADMM"=> :green)
-
-tickfont = 16
-width = 2
-viol = true
-# plt1 = plot(size = (400,600), tickfont = tickfont)
-# for (key, value) in tt_com1
-#     if key !== "nADMM"
-#         x = fill(key, length(value))
-#         if viol == true violin!(plt1, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
-#         boxplot!(plt1, x, value./100, label="", outliers = false, linewidth = width)
-#         # dotplot!(plt1, [key], value./100, label="",markersize=3)
-#     end
-# end
-# annotate!((0, ylims(plt1)[2], text("x100", :left, tickfont)))
-# savefig(plt1,joinpath("media","figs","disjoint_problem","Tot-com-3-10.pdf"))
-
-
-plt2 = plot(size = (400,600), tickfont = tickfont, yticks = [10, 12, 14, 16, 18, 20])
-for (key, value) in tt_com2
-    if key !== "nADMM"
-        x = fill(key, length(value))
-        if viol == true violin!(plt2, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
-        boxplot!(plt2, x, value./100, label="", outliers = false, linewidth = width)
-        # dotplot!(plt2, [key], value, label="",markersize=3)
+function add_algorithm_legend!(fig)
+    for alg in ALG_ORDER
+        plot!(
+            fig,
+            [NaN],
+            [NaN],
+            color = :black,
+            linestyle = ALG_LINESTYLE[alg],
+            linewidth = 2.5,
+            # marker = ALG_MARKER[alg],
+            # markersize = alg == "hADMM" ? 6 : 0,
+            label = alg,
+        )
     end
 end
-annotate!((0, ylims(plt2)[2], text("×100", :left, tickfont)))
-savefig(plt2,joinpath(@__DIR__, "..", "..", "media","figs","disjoint_problem","Tot-com-3-20.pdf"))
 
-# plt3 = plot(size = (400,600), tickfont = tickfont)
-# for (key, value) in tt_com3
-#     if key !== "nADMM"
-#         x = fill(key, length(value))
-#         if viol == true violin!(plt3, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
-#         boxplot!(plt3, [key], value./100, label="", outliers = false, linewidth = width)
-#         # dotplot!(plt3, [key], value, label="",markersize=3)
-#     end
-# end
-# annotate!((0, ylims(plt3)[2], text("×100", :left, tickfont)))
-# savefig(plt3,joinpath("media","figs","disjoint_problem","Tot-com-5-20.pdf"))
+function plot_metric_by_topology(df::DataFrame, topologies, metric_col::Symbol, ylabel::String, output_name::String; yscale = :identity)
+    palette = TOPOLOGY_COLORS[1:min(length(topologies), length(TOPOLOGY_COLORS))]
+    topo_color = Dict(topo => palette[i] for (i, topo) in enumerate(topologies))
 
+    fig = plot(
+        framestyle = :box,
+        guidefont = font(16),
+        tickfontsize = 14,
+        legendfontsize = 12,
+        xlabel = "Convergence Iteration Count",
+        ylabel = ylabel,
+        yscale = yscale,
+        grid = true,
+        size = (900, 650),
+        legend = :topright,
+    )
 
-# plt4 = plot(size = (400,600),  tickfont = tickfont)
-# for (key, value) in max_com1
-#     if key !== "nADMM"
-#         x = fill(key, length(value))
-#         if viol == true violin!(plt4, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
-#         boxplot!(plt4, [key], value/100, label="", outliers = false, linewidth = width)
-#     end
-# end
-# annotate!((0, ylims(plt4)[2], text("×100", :left, tickfont)))
-# savefig(plt4,joinpath("media","figs","disjoint_problem","Max-com-3-10.pdf"))
-
-plt5 = plot(size = (400,600),  tickfont = tickfont)
-for (key, value) in max_com2
-    if key !== "nADMM"
-        x = fill(key, length(value))
-        if viol == true violin!(plt5, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
-        boxplot!(plt5, [key], value/100, label="", outliers = false, linewidth = width)
-    end
-end
-annotate!((0, ylims(plt5)[2], text("×100", :left, tickfont)))
-savefig(plt5,joinpath(@__DIR__, "..", "..", "media","figs","disjoint_problem","Max-com-3-20.pdf"))
-
-# plt6 = plot(size = (400,600),  tickfont = tickfont)
-# for (key, value) in max_com3
-#     if key !== "nADMM"
-#         x = fill(key, length(value))
-#         if viol == true violin!(plt6, x, value./100, label="", color=:red, fillalpha=0.25, linealpha=0, outliers = false) end
-#         boxplot!(plt6, [key], value/100, label="", outliers = false, linewidth = width)
-#     end
-# end
-# annotate!((0, ylims(plt6)[2], text("×100", :left, tickfont)))
-# savefig(plt6,joinpath("media","figs","disjoint_problem","Max-com-5-20.pdf"))
-
-
-# Function to calculate optimality gap from trajectories
-function calculate_metrics(df, topo, alg, opt_val)
-    topo_df = filter(row -> row.topology == topo, df)
-    
-    obj_col = Symbol(string(alg, "_objective"))
-    # Lấy toàn bộ iteration và giá trị objective, kể cả missing
-    iters = topo_df.iteration
-    obj_vals = topo_df[!, obj_col]
-    # Tính optimality gap, giữ missing nếu có
-    opt_gap = abs.(obj_vals .- opt_val) ./ abs(opt_val) .* 100
-    return iters, opt_gap
-end
-
-# Function to get total communication from CSV
-function get_total_communication(df, topo, alg)
-    topo_df = filter(row -> row.topology == topo, df)
-    
-    com_col = Symbol(string(alg, "_total_communication"))
-    # Lấy toàn bộ iteration và giá trị communication, kể cả missing
-    iters = topo_df.iteration
-    total_com = topo_df[!, com_col]
-    return iters, total_com
-end
-
-# Function to plot trajectories with dual y-axes from CSV file
-function plot_trajectories(D, N)
-    file_path = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem", string("trajectories-D=", D, "-N=", N, ".csv"))
-    
-    if !isfile(file_path)
-        println("File not found: ", file_path)
-        println("Please run main.jl first to generate the trajectories CSV file.")
-        return
-    end
-    
-    println("Reading trajectories from: ", file_path)
-    df = CSV.read(file_path, DataFrame)
-    
-    unique_topos = unique(df.topology)
-    colors = [:blue, :green, :red, :purple, :orange, :cyan, :brown, :magenta, :black]
-    for alg in ["hADMM", "fADMM", "nADMM"]
-        plt = plot(framestyle=:box, tickfont=14, guidefont=14, legendfontsize=8,
-                   xlabel="Iteration", ylabel="Optimality Gap (%)",
-                   yscale=:log10, legend=:topright, size=(800, 600))
-        plt2 = twinx(plt)
-        plot!(plt2, ylabel="Total Communication", tickfont=14, guidefont=14,
-              yscale=:log10, legend=false)
-        for (i, topo) in enumerate(unique_topos)
-            c = colors[mod1(i, length(colors))]
+    for topo in topologies
+        for alg in ALG_ORDER
             subdf = filter(row -> row.topology == topo && row.alg == alg, df)
-            if isempty(subdf)
+
+            if nrow(subdf) == 0
                 continue
             end
-            opt_val = subdf.optimal_value[1]
-            iters = subdf.iteration
-            opt_gap = abs.(subdf.objective .- opt_val) ./ abs(opt_val) .* 100
-            total_com = subdf.total_communication
-            plot!(plt, iters, opt_gap, color=c, linewidth=2, alpha=0.7, label="Topo $topo")
-            plot!(plt2, iters, total_com, color=c, linewidth=2, alpha=0.7, label="")
+
+            sort!(subdf, :iteration)
+            x_values = convergence_iterations(subdf)
+            y_values = subdf[!, metric_col]
+            if yscale == :log10
+                y_values = max.(y_values, eps(Float64))
+            end
+
+            plot!(
+                fig,
+                x_values,
+                y_values,
+                color = topo_color[topo],
+                linestyle = ALG_LINESTYLE[alg],
+                linewidth = 2.5,
+                marker = ALG_MARKER[alg],
+                # markersize = alg == "hADMM" ? 4 : 0,
+                # markeralpha = alg == "hADMM" ? 0.9 : 0.0,
+                alpha = 1.0,
+                label = "",
+            )
         end
-        savefig(plt, joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem",
-                string("Trajectory-DualAxis-", alg, "-D=", D, "-N=", N, ".pdf")))
-        println("Saved dual-axis plot for $alg")
     end
+
+    add_algorithm_legend!(fig)
+    savefig(fig, joinpath(FIG_DIR, output_name))
+    return fig
 end
 
-# Generate trajectory plots
-println("\nGenerating trajectory plots from CSV...")
-plot_trajectories(3, 30)
-println("\nAll plots generated successfully!")
+function plot_gap_vs_communication(df::DataFrame, topologies, output_name::String)
+    palette = TOPOLOGY_COLORS[1:min(length(topologies), length(TOPOLOGY_COLORS))]
+    topo_color = Dict(topo => palette[i] for (i, topo) in enumerate(topologies))
+
+    fig = plot(
+        framestyle = :box,
+        guidefont = font(16),
+        tickfontsize = 14,
+        legendfontsize = 12,
+        xlabel = "Total Communication",
+        ylabel = "Optimality Gap (%)",
+        xscale = :log10,
+        yscale = :log10,
+        grid = true,
+        size = (900, 650),
+        legend = :topright,
+    )
+
+    for topo in topologies
+        for alg in ALG_ORDER
+            subdf = filter(row -> row.topology == topo && row.alg == alg, df)
+
+            if nrow(subdf) == 0
+                continue
+            end
+
+            sort!(subdf, :iteration)
+            x_values = max.(subdf.total_communication, eps(Float64))
+            y_values = max.(subdf.objective_gap, eps(Float64))
+
+            plot!(
+                fig,
+                x_values,
+                y_values,
+                color = topo_color[topo],
+                linestyle = ALG_LINESTYLE[alg],
+                linewidth = 2.5,
+                marker = ALG_MARKER[alg],
+                # markersize = alg == "hADMM" ? 4 : 0,
+                # markeralpha = alg == "hADMM" ? 0.9 : 0.0,
+                alpha = 1.0,
+                label = "",
+            )
+        end
+    end
+
+    add_algorithm_legend!(fig)
+    savefig(fig, joinpath(FIG_DIR, output_name))
+    return fig
+end
+
+function main()
+    if !isfile(TRAJECTORY_FILE)
+        error("Trajectory CSV not found: $TRAJECTORY_FILE")
+    end
+
+    mkpath(FIG_DIR)
+
+    df = CSV.read(TRAJECTORY_FILE, DataFrame)
+    df.objective_gap = abs.(df.objective .- df.optimal_value) ./ abs.(df.optimal_value) .* 100
+
+    topologies = sampled_topologies(df)
+    println("Plotting topologies: ", topologies)
+
+    fig_gap = plot_metric_by_topology(
+        df,
+        topologies,
+        :objective_gap,
+        "Optimality Gap (%)",
+        "OptGap-vs-Iteration-RandomTopologies-D=$(nD)-N=$(nN).pdf";
+        yscale = :log10,
+    )
+
+    fig_comm = plot_metric_by_topology(
+        df,
+        topologies,
+        :total_communication,
+        "Total Communication",
+        "TotalCommunication-vs-Iteration-RandomTopologies-D=$(nD)-N=$(nN).pdf";
+        yscale = :log10,
+    )
+
+    fig_gap_comm = plot_gap_vs_communication(
+        df,
+        topologies,
+        "OptGap-vs-TotalCommunication-RandomTopologies-D=$(nD)-N=$(nN).pdf",
+    )
+
+    display(fig_gap)
+    display(fig_comm)
+    display(fig_gap_comm)
+
+    println("Figures saved to: ", FIG_DIR)
+end
+
+main()
