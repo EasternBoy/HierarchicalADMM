@@ -3,8 +3,8 @@ using DataFrames
 using Plots
 using Statistics
 
-const nN = 30
-const nD = 5
+const nN = 50
+const nD = 4
 
 const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
 const FIG_DIR = joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem")
@@ -35,22 +35,19 @@ extreme_cases = [
     (
         label = "Worst Optimality Gap",
         topology = worst_gap_topo,
-        y_col = :objective_gap,
-        y_label = "Optimality Gap (%)",
-        y_scale = :log10,
-        filename = "WorstOptGap-Comparison-D=$(nD)-N=$(nN).pdf",
+        filename = "WorstOptGap-DualAxis-D=$(nD)-N=$(nN).pdf",
+        gap_comm_filename = "WorstOptGap-OptGap-vs-Communication-D=$(nD)-N=$(nN).pdf",
     ),
     (
         label = "Max Communication",
         topology = max_comm_topo,
-        y_col = :total_communication,
-        y_label = "Total Communication",
-        y_scale = :log10,
-        filename = "MaxCommunication-Comparison-D=$(nD)-N=$(nN).pdf",
+        filename = "MaxCommunication-DualAxis-D=$(nD)-N=$(nN).pdf",
+        gap_comm_filename = "MaxCommunication-OptGap-vs-Communication-D=$(nD)-N=$(nN).pdf",
     ),
 ]
 
-alg_order = ["hADMM", "fADMM"]
+alg_order = ["fADMM", "hADMM"]
+alg_color = Dict("hADMM" => :blue, "fADMM" => :red)
 
 function convergence_iterations(subdf::DataFrame)
     final_root_iter = maximum(subdf.iteration)
@@ -62,6 +59,66 @@ function convergence_iterations(subdf::DataFrame)
     end
 
     return subdf.iteration .* final_iter_count ./ final_root_iter
+end
+
+function plot_dual_axis_case(topo_df::DataFrame, case_label::String, topo, filename::String)
+    fig = plot(
+        framestyle = :box,
+        guidefont = font(16),
+        tickfontsize = 14,
+        legendfontsize = 12,
+        xlabel = "Iteration",
+        ylabel = "Optimality Gap (%)",
+        yscale = :log10,
+        title = "$(case_label): Topology $(topo)",
+        grid = true,
+        legend = :topright,
+    )
+    fig_comm = twinx(fig)
+    plot!(
+        fig_comm,
+        ylabel = "Total Communication",
+        yscale = :log10,
+        tickfontsize = 14,
+        guidefont = font(16),
+        legend = :bottomright,
+    )
+
+    for alg in alg_order
+        alg_df = filter(row -> row.alg == alg, topo_df)
+
+        if nrow(alg_df) == 0
+            continue
+        end
+
+        sort!(alg_df, :iteration)
+        x_values = convergence_iterations(alg_df)
+        gap_values = max.(alg_df.objective_gap, eps(Float64))
+        communication_values = max.(alg_df.total_communication, eps(Float64))
+
+        plot!(
+            fig,
+            x_values,
+            gap_values,
+            color = alg_color[alg],
+            linestyle = :solid,
+            linewidth = 2,
+            label = alg,
+        )
+
+        plot!(
+            fig_comm,
+            x_values,
+            communication_values,
+            color = alg_color[alg],
+            linestyle = :dash,
+            linewidth = 2,
+            label = "",
+        )
+    end
+
+    savefig(fig, joinpath(FIG_DIR, filename))
+    display(fig)
 end
 
 function plot_gap_vs_communication(topo_df::DataFrame, case_label::String, topo, filename::String)
@@ -76,6 +133,7 @@ function plot_gap_vs_communication(topo_df::DataFrame, case_label::String, topo,
         yscale = :log10,
         title = "$(case_label): Topology $(topo)",
         grid = true,
+        legend = :topright,
     )
 
     for alg in alg_order
@@ -93,9 +151,8 @@ function plot_gap_vs_communication(topo_df::DataFrame, case_label::String, topo,
             fig,
             x_values,
             y_values,
+            color = alg_color[alg],
             linewidth = 2,
-            # marker = :circle,
-            # markersize = 3,
             label = alg,
         )
     end
@@ -107,53 +164,13 @@ end
 for case in extreme_cases
     topo_df = filter(row -> row.topology == case.topology, df)
 
-    fig = plot(
-        framestyle = :box,
-        guidefont = font(16),
-        tickfontsize = 14,
-        legendfontsize = 12,
-        xlabel = "Convergence Iteration Count",
-        ylabel = case.y_label,
-        yscale = case.y_scale,
-        title = "$(case.label): Topology $(case.topology)",
-        grid = true,
-    )
-
-    for alg in alg_order
-        alg_df = filter(row -> row.alg == alg, topo_df)
-
-        if nrow(alg_df) == 0
-            continue
-        end
-
-        sort!(alg_df, :iteration)
-        x_values = convergence_iterations(alg_df)
-        y_values = alg_df[!, case.y_col]
-        if case.y_scale == :log10
-            y_values = max.(y_values, eps(Float64))
-        end
-
-        plot!(
-            fig,
-            x_values,
-            y_values,
-            linewidth = 2,
-            # marker = :circle,
-            # markersize = 3,
-            label = alg,
-        )
-    end
-
-    savefig(fig, joinpath(FIG_DIR, case.filename))
-    display(fig)
-
-    gap_comm_filename = replace(case.filename, "Comparison" => "OptGap-vs-Communication")
-    plot_gap_vs_communication(topo_df, case.label, case.topology, gap_comm_filename)
+    plot_dual_axis_case(topo_df, case.label, case.topology, case.filename)
+    plot_gap_vs_communication(topo_df, case.label, case.topology, case.gap_comm_filename)
 end
 
 println("Worst optimality gap topology: ", worst_gap_topo)
 println("Max communication topology: ", max_comm_topo)
 println("\nTopology scores:")
-show(topology_scores, allrows = true, allcols = true)
+# show(topology_scores, allrows = true, allcols = true)
 println()
 println("Figures saved to: ", FIG_DIR)

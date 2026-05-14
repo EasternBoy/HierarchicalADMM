@@ -7,8 +7,8 @@ using DataFrames
 using Plots
 using Random
 
-const nD = 5
-const nN = 30
+const nD = 4
+const nN = 50
 const N_TOPOLOGIES_TO_PLOT = 5
 const RNG_SEED = 2026
 
@@ -84,11 +84,11 @@ function plot_metric_by_topology(df::DataFrame, topologies, metric_col::Symbol, 
         guidefont = font(16),
         tickfontsize = 14,
         legendfontsize = 12,
-        xlabel = "Convergence Iteration Count",
+        xlabel = "Iteration",
         ylabel = ylabel,
         yscale = yscale,
         grid = true,
-        size = (900, 650),
+        size = (800, 600),
         legend = :topright,
     )
 
@@ -142,7 +142,7 @@ function plot_gap_vs_communication(df::DataFrame, topologies, output_name::Strin
         xscale = :log10,
         yscale = :log10,
         grid = true,
-        size = (900, 650),
+        size = (800, 600),
         legend = :topright,
     )
 

@@ -18,7 +18,7 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 30
+const nN   = 50
 const nD   = 4
 
 const λₙ   = 2e-3
@@ -40,7 +40,7 @@ final_obj  = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64
 topo_arr = linknode[]
 
 
-nTestTopo = 50
+nTestTopo = 20
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
@@ -184,7 +184,10 @@ end
 
 final_rows.objective_gap = abs.(final_rows.objective - final_rows.optimal_value) ./ abs.(final_rows.optimal_value) * 100
 
-topology_scores = combine(groupby(final_rows, :topology),
+extreme_algorithms = ["hADMM", "fADMM"]
+extreme_final_rows = filter(row -> row.alg in extreme_algorithms, final_rows)
+
+topology_scores = combine(groupby(extreme_final_rows, :topology),
     :objective_gap => mean => :mean_objective_gap,
     :total_communication => mean => :mean_total_communication,
 )
@@ -200,6 +203,7 @@ extreme_traj = filter(x -> x.topology in extreme_topo, combined_trajectories)
 extreme_csv_filename = joinpath("data", "disjoint-problem", string("trajectories-extreme-D=", nD, "-N=", nN, ".csv"))
 CSV.write(extreme_csv_filename, extreme_traj)
 println("Extreme trajectories saved to: $extreme_csv_filename")
+println("Extreme case criteria use algorithms: $extreme_algorithms")
 println("Worst optimality gap topology: $worst_gap_topo")
 println("Max communication topology: $worst_comm_topo")
 
