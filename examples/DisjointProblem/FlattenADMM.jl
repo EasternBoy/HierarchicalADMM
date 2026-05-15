@@ -161,6 +161,16 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
     traj_com = Float64[]
     traj_root_com = Float64[]
 
+    push!(traj_opt, total_cost(root))
+    push!(traj_res, NaN)
+    push!(traj_com, 0.0)
+    push!(traj_root_com, 0.0)
+    if dict_result !== nothing
+        initial_err = Float64[]
+        get_err!(root, dict_result, initial_err)
+        push!(traj_err, sum(initial_err))
+    end
+
     # Initialize the query vector
     for iteration in 1:max_iter
 

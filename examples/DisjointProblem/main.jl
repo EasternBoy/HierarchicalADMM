@@ -18,8 +18,8 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 50
-const nD   = 4
+const nN   = 30
+const nD   = 6
 
 const λₙ   = 2e-3
 const λₕ   = 2e-3
@@ -40,7 +40,7 @@ final_obj  = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64
 topo_arr = linknode[]
 
 
-nTestTopo = 20
+nTestTopo = 10
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
@@ -80,9 +80,9 @@ for tp in 1:nTestTopo
     push!(dual_res["hADMM"],   traj_res[end])
     push!(final_obj["hADMM"],  traj_opt[end])
 
-    plot!(figPrime, 1:length(traj_err), traj_err, yscale = :log10, grid = true, label = "")
-    plot!(figRes, 1:length(traj_res), traj_res, yscale = :log10, grid = true, label = "")
-    plot!(figJ, 1:length(traj_opt), abs.(traj_opt .- opt_value)/maximum(abs.(traj_opt .- opt_value)), yscale = :log10, grid = true, label = "")
+    plot!(figPrime, 0:(length(traj_err)-1), traj_err, yscale = :log10, grid = true, label = "")
+    plot!(figRes, 0:(length(traj_res)-1), traj_res, yscale = :log10, grid = true, label = "")
+    plot!(figJ, 0:(length(traj_opt)-1), abs.(traj_opt .- opt_value)/maximum(abs.(traj_opt .- opt_value)), yscale = :log10, grid = true, label = "")
 
     ## Nested ADMM
     reset!(root)
@@ -91,6 +91,13 @@ for tp in 1:nTestTopo
     traj_opt_n = Float64[]
     traj_com_n = Float64[]
     traj_root_com_n = Float64[]
+    initial_err_n = Float64[]
+    get_err!(root, dict_result, initial_err_n)
+    push!(traj_err_n, sum(initial_err_n))
+    push!(traj_res_n, NaN)
+    push!(traj_opt_n, total_cost(root))
+    push!(traj_com_n, 0.0)
+    push!(traj_root_com_n, 0.0)
     nestedADMM!(root, 0., tol=tol, max_iter=max_iter, dict_result=dict_result, traj_err=traj_err_n, traj_res=traj_res_n, traj_opt=traj_opt_n, traj_com=traj_com_n, traj_root_com=traj_root_com_n)
     println("nADMM root node trajectory length: ", length(traj_opt_n))
    
@@ -131,7 +138,7 @@ for tp in 1:nTestTopo
 
     df_hADMM = DataFrame(
         topology = fill(tp, length(traj_err)),
-        iteration = 1:length(traj_err),
+        iteration = 0:(length(traj_err)-1),
         alg = fill("hADMM", length(traj_err)),
         primal_error = traj_err,
         dual_residual = traj_res,
@@ -143,7 +150,7 @@ for tp in 1:nTestTopo
     )
     df_nADMM = DataFrame(
         topology = fill(tp, length(traj_err_n)),
-        iteration = 1:length(traj_err_n),
+        iteration = 0:(length(traj_err_n)-1),
         alg = fill("nADMM", length(traj_err_n)),
         primal_error = traj_err_n,
         dual_residual = traj_res_n,
@@ -155,7 +162,7 @@ for tp in 1:nTestTopo
     )
     df_fADMM = DataFrame(
         topology = fill(tp, length(traj_err_f)),
-        iteration = 1:length(traj_err_f),
+        iteration = 0:(length(traj_err_f)-1),
         alg = fill("fADMM", length(traj_err_f)),
         primal_error = traj_err_f,
         dual_residual = traj_res_f,

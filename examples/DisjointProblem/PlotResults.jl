@@ -7,8 +7,8 @@ using DataFrames
 using Plots
 using Random
 
-const nD = 4
-const nN = 50
+const nD = 6
+const nN = 30
 const N_TOPOLOGIES_TO_PLOT = 5
 const RNG_SEED = 2026
 
