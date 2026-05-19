@@ -2,6 +2,7 @@ include("../../src/linknodes.jl")
 
 # Define cost function and its gradient for each type of node
 ## Leaf nodes
+# convex
 function cost_func_leaf(x; para)
     return 1/2*dot(x .- para[1], x .- para[1])^2
 end
@@ -27,6 +28,32 @@ end
 function grad_cost_root(x; para)
     return 2*(x .- para[1])*dot(x .- para[1], x .- para[1])
 end
+
+
+# # strongly convex
+# function cost_func_leaf(x; para)
+#     return 1/2 * dot(x .- para[1], x .- para[1])
+# end
+
+# function grad_cost_leaf(x; para)
+#     return x .- para[1]
+# end
+
+# function cost_func_parent(x; para)
+#     return 1/2 * dot(x .- para[1], x .- para[1])
+# end
+
+# function grad_cost_parent(x; para)
+#     return x .- para[1]
+# end
+
+# function cost_func_root(x; para)
+#     return 1/2 * dot(x .- para[1], x .- para[1])
+# end
+
+# function grad_cost_root(x; para)
+#     return x .- para[1]
+# end
 
 function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
     global countID

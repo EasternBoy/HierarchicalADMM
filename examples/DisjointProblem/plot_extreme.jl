@@ -4,7 +4,7 @@ using Plots
 using Statistics
 
 const nN = 30
-const nD = 6
+const nD = 3
 
 const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
 const FIG_DIR = joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem")

@@ -20,7 +20,7 @@ function Proximal_Iteration(cost_func::CostFunc, q::Union{Float64, Vector{Float6
     return f, g
 end
 
-function proxAlg!(node::linknode; λ = λₕ)  
+function proxAlg!(node::linknode; λ = λh)  
 
     nc        = 0
     q         = Float64[]
@@ -76,16 +76,16 @@ function proxAlg!(node::linknode; λ = λₕ)
 end
 
 
-function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
+function hierarchicalADMM!(node::linknode, ter::Vector{Float64}; λ = λh)
 
     node.iteration += 1
     
     #Update prime
-    proxAlg!(node)
+    proxAlg!(node; λ = λ)
 
     if node.children !== nothing
         for child in node.children
-            hierarchicalADMM!(child, ter)
+            hierarchicalADMM!(child, ter; λ = λ)
             #Update dual
             child_prime = vect_prime(child)
             res = node.prime[child.ID] - child_prime
@@ -100,12 +100,52 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
     end
 end
 
+function max_primal_residual(node::linknode)
+    max_res = 0.0
 
-function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_iter = max_iter)
+    if node.children !== nothing
+        for child in node.children
+            res = node.prime[child.ID] - vect_prime(child)
+            max_res = max(max_res, maximum(abs.(res)))
+            max_res = max(max_res, max_primal_residual(child))
+        end
+    end
+
+    return max_res
+end
+
+function snapshot_edge_parent_primes!(node::linknode, snapshot::Dict)
+    if node.children !== nothing
+        for child in node.children
+            snapshot[(node.ID, child.ID)] = copy(node.prime[child.ID])
+            snapshot_edge_parent_primes!(child, snapshot)
+        end
+    end
+end
+
+function max_dual_residual(node::linknode, prev_parent_primes::Dict)
+    max_res = 0.0
+
+    if node.children !== nothing
+        for child in node.children
+            edge_key = (node.ID, child.ID)
+            res = node.prime[child.ID] - prev_parent_primes[edge_key]
+            max_res = max(max_res, maximum(abs.(res)))
+            max_res = max(max_res, max_dual_residual(child, prev_parent_primes))
+        end
+    end
+
+    return max_res
+end
+
+
+function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λh, max_iter = max_iter, return_residuals = false)
     global stop_arr
     
     traj_err = Float64[]
     traj_res = Float64[]
+    traj_primal_res = Float64[]
+    traj_dual_res = Float64[]
     opt_value = Float64[]
     traj_com = Float64[]
     traj_root_com = Float64[]
@@ -114,18 +154,25 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
     get_err!(root, dict_result, initial_err)
     push!(traj_err, sum(initial_err))
     push!(traj_res, NaN)
+    push!(traj_primal_res, NaN)
+    push!(traj_dual_res, NaN)
     push!(opt_value, total_cost(root))
     push!(traj_com, 0.0)
     push!(traj_root_com, 0.0)
     
     for iteration in 1:max_iter
         ter = Float64[]
-        hierarchicalADMM!(root, ter)
+        prev_parent_primes = Dict()
+        snapshot_edge_parent_primes!(root, prev_parent_primes)
+
+        hierarchicalADMM!(root, ter; λ = λ)
 
         err = Float64[]
         get_err!(root, dict_result, err)
         push!(opt_value, total_cost(root))
         push!(traj_res, maximum(ter))
+        push!(traj_primal_res, max_primal_residual(root))
+        push!(traj_dual_res, max_dual_residual(root, prev_parent_primes))
         push!(traj_err, sum(err))
         
         # Track total communication after this iteration
@@ -135,10 +182,16 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
 
         if maximum(ter) < tol
             println("hADMM converged after $iteration iterations in root")
+            if return_residuals
+                return traj_err, traj_res, opt_value, traj_com, traj_root_com, traj_primal_res, traj_dual_res
+            end
             return traj_err, traj_res, opt_value, traj_com, traj_root_com
         end
     end
 
+    if return_residuals
+        return traj_err, traj_res, opt_value, traj_com, traj_root_com, traj_primal_res, traj_dual_res
+    end
     return traj_err, traj_res, opt_value, traj_com, traj_root_com
 end
 

@@ -1,4 +1,4 @@
-function update_leaf!(node::linknode, query::Vector{Float64}; λ = λₙ)
+function update_leaf!(node::linknode, query::Vector{Float64}; λ = λn)
     node.cost_func.q = query
     node.cost_func.λ = λ
 
@@ -14,7 +14,7 @@ function update_leaf!(node::linknode, query::Vector{Float64}; λ = λₙ)
 end
 
 
-function update_parent!(node::linknode, top_query::Vector{Float64}, query::Vector{Float64}; λ = λₙ)
+function update_parent!(node::linknode, top_query::Vector{Float64}, query::Vector{Float64}; λ = λn)
     
     node.cost_func.q = (query+top_query)/2
     node.cost_func.λ = λ/2
@@ -35,7 +35,7 @@ function update_parent!(node::linknode, top_query::Vector{Float64}, query::Vecto
 end
 
 
-function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
+function update_root!(node::linknode, query::Vector{Float64}; λ = λn)
     node.cost_func.q = query
     node.cost_func.λ = λ
 
@@ -55,7 +55,7 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
 end
 
 
-function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter, dict_result = nothing, traj_err = nothing, traj_res = nothing, traj_opt = nothing, traj_com = nothing, traj_root_com = nothing)
+function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter, dict_result = nothing, traj_err = nothing, traj_res = nothing, traj_opt = nothing, traj_com = nothing, traj_root_com = nothing, traj_primal_res = nothing, traj_dual_res = nothing)
 
     node.iteration += 1
 
@@ -63,6 +63,10 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
         for iteration in 1:max_iter 
 
             ter = Float64[]
+            prev_parent_primes = Dict()
+            if node.parent === nothing && traj_primal_res !== nothing && traj_dual_res !== nothing
+                snapshot_edge_parent_primes!(node, prev_parent_primes)
+            end
 
             child_primes = Float64[] 
             for child in node.children
@@ -95,6 +99,12 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
             if node.parent === nothing && dict_result !== nothing && traj_err !== nothing && traj_res !== nothing && traj_opt !== nothing
                 push!(traj_opt, total_cost(node))
                 push!(traj_res, maximum(abs.(ter)))
+                if traj_primal_res !== nothing
+                    push!(traj_primal_res, max_primal_residual(node))
+                end
+                if traj_dual_res !== nothing
+                    push!(traj_dual_res, max_dual_residual(node, prev_parent_primes))
+                end
                 err = Float64[]
                 get_err!(node, dict_result, err)
                 push!(traj_err, sum(err))

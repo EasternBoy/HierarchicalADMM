@@ -13,7 +13,7 @@ function collect_nodes!(node::linknode, flatten_nodes)
 end
 
 
-function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict, dict_dual::Dict, pos::Dict, nV::Dict; λ = λₙ)
+function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict, dict_dual::Dict, pos::Dict, nV::Dict; λ = λf)
     para = root.cost_func.para
     func = root.cost_func.val
 
@@ -44,7 +44,7 @@ function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_chi
 end
 
 
-function update_leaf_flat(node::linknode, query::Vector{Float64}, λ = λₙ)
+function update_leaf_flat(node::linknode, query::Vector{Float64}, λ = λf)
     para = node.cost_func.para
     func = node.cost_func.val
 
@@ -130,7 +130,7 @@ end
 
 
 
-function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter, dict_result = nothing)
+function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter, dict_result = nothing, return_residuals = false)
 
     # Flatten the tree structure into a list of nodes
     dict_prime_child = Dict()
@@ -157,12 +157,16 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
     # Track trajectories
     traj_err = Float64[]
     traj_res = Float64[]
+    traj_primal_res = Float64[]
+    traj_dual_res = Float64[]
     traj_opt = Float64[]
     traj_com = Float64[]
     traj_root_com = Float64[]
 
     push!(traj_opt, total_cost(root))
     push!(traj_res, NaN)
+    push!(traj_primal_res, NaN)
+    push!(traj_dual_res, NaN)
     push!(traj_com, 0.0)
     push!(traj_root_com, 0.0)
     if dict_result !== nothing
@@ -175,8 +179,9 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
     for iteration in 1:max_iter
 
         root.iteration += 1 #Add 1 iteration in root
+        prev_prime_root = Dict(key => copy(value) for (key, value) in dict_prime_root)
 
-        update_root_flat!(root, dict_prime_root, dict_prime_child, dict_dual, pos, nV)
+        update_root_flat!(root, dict_prime_root, dict_prime_child, dict_dual, pos, nV; λ = λ)
 
         ter = Float64[]
         # Iterate through the nodes to solve the optimization problem
@@ -186,7 +191,7 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
             query = dict_prime_root[key] + dict_dual[key]
 
             com_cost!(path[key], query, 1) #Communication from root to child
-            dict_prime_child[key] = update_leaf_flat(value, query)
+            dict_prime_child[key] = update_leaf_flat(value, query, λ)
 
             res = dict_prime_root[key] - dict_prime_child[key]
             dict_dual[key] += res
@@ -201,6 +206,8 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
         # Track metrics AFTER updating all node.prime values
         push!(traj_opt, total_cost(root))
         push!(traj_res, maximum(ter))
+        push!(traj_primal_res, maximum(ter))
+        push!(traj_dual_res, maximum(maximum(abs.(dict_prime_root[key] - prev_prime_root[key])) for key in keys(dict_prime_root)))
         
         # Track total communication after this iteration
         total, _ = tt_com_iter(root)
@@ -219,5 +226,8 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
         end
     end
 
+    if return_residuals
+        return dict_prime_root, traj_err, traj_res, traj_opt, traj_com, traj_root_com, traj_primal_res, traj_dual_res
+    end
     return dict_prime_root, traj_err, traj_res, traj_opt, traj_com, traj_root_com
 end

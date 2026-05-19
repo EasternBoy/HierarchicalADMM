@@ -18,11 +18,12 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 30
-const nD   = 6
+const nN   = 20
+const nD   = 3
 
-const λₙ   = 2e-3
-const λₕ   = 2e-3
+const λn   = 1e-3
+const λf   = 1e-3
+const λh   = 1e-3
 const tol  = 1e-4
 const max_iter = 1000
 
@@ -40,12 +41,16 @@ final_obj  = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64
 topo_arr = linknode[]
 
 
-nTestTopo = 10
+nTestTopo = 5
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
 figRes = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
 figJ = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
+
+function print_last_residual(algorithm::String, primal::Float64, dual::Float64)
+    println("$(algorithm) final residuals: primal = $(@sprintf("%.3e", primal)), dual = $(@sprintf("%.3e", dual))")
+end
 
 # Storage for all trajectories across topologies
 all_trajectories = DataFrame[]
@@ -66,7 +71,7 @@ for tp in 1:nTestTopo
 
     ## Hierarchical ADMM
     reset!(root)
-    traj_err, traj_res, traj_opt, traj_com_h, traj_root_com_h = hADMM(root, dict_result)
+    traj_err, traj_res, traj_opt, traj_com_h, traj_root_com_h, traj_primal_res_h, traj_dual_res_h = hADMM(root, dict_result, return_residuals = true)
     push!(topo_arr, deepcopy(root))
     
     total, max_num = tt_com_iter(root)
@@ -76,9 +81,10 @@ for tp in 1:nTestTopo
     push!(tt_com["hADMM"],    total["com"])
     push!(root_com["hADMM"],  root.com_cost)
     push!(opt_gap["hADMM"],   abs(traj_opt[end] - opt_value) / abs(opt_value) * 100)
-    push!(primal_res["hADMM"], traj_err[end])
-    push!(dual_res["hADMM"],   traj_res[end])
+    push!(primal_res["hADMM"], traj_primal_res_h[end])
+    push!(dual_res["hADMM"],   traj_dual_res_h[end])
     push!(final_obj["hADMM"],  traj_opt[end])
+    print_last_residual("hADMM", traj_primal_res_h[end], traj_dual_res_h[end])
 
     plot!(figPrime, 0:(length(traj_err)-1), traj_err, yscale = :log10, grid = true, label = "")
     plot!(figRes, 0:(length(traj_res)-1), traj_res, yscale = :log10, grid = true, label = "")
@@ -91,14 +97,18 @@ for tp in 1:nTestTopo
     traj_opt_n = Float64[]
     traj_com_n = Float64[]
     traj_root_com_n = Float64[]
+    traj_primal_res_n = Float64[]
+    traj_dual_res_n = Float64[]
     initial_err_n = Float64[]
     get_err!(root, dict_result, initial_err_n)
     push!(traj_err_n, sum(initial_err_n))
     push!(traj_res_n, NaN)
+    push!(traj_primal_res_n, NaN)
+    push!(traj_dual_res_n, NaN)
     push!(traj_opt_n, total_cost(root))
     push!(traj_com_n, 0.0)
     push!(traj_root_com_n, 0.0)
-    nestedADMM!(root, 0., tol=tol, max_iter=max_iter, dict_result=dict_result, traj_err=traj_err_n, traj_res=traj_res_n, traj_opt=traj_opt_n, traj_com=traj_com_n, traj_root_com=traj_root_com_n)
+    nestedADMM!(root, 0., tol=tol, max_iter=max_iter, dict_result=dict_result, traj_err=traj_err_n, traj_res=traj_res_n, traj_opt=traj_opt_n, traj_com=traj_com_n, traj_root_com=traj_root_com_n, traj_primal_res=traj_primal_res_n, traj_dual_res=traj_dual_res_n)
     println("nADMM root node trajectory length: ", length(traj_opt_n))
    
     if length(traj_com_n) < length(traj_opt_n)
@@ -116,13 +126,14 @@ for tp in 1:nTestTopo
     push!(tt_com["nADMM"],    total["com"])
     push!(root_com["nADMM"],  root.com_cost)
     push!(opt_gap["nADMM"],   abs(traj_opt_n[end] - opt_value) / abs(opt_value) * 100)
-    push!(primal_res["nADMM"], traj_err_n[end])
-    push!(dual_res["nADMM"],   traj_res_n[end])
+    push!(primal_res["nADMM"], traj_primal_res_n[end])
+    push!(dual_res["nADMM"],   traj_dual_res_n[end])
     push!(final_obj["nADMM"],  traj_opt_n[end])
+    print_last_residual("nADMM", traj_primal_res_n[end], traj_dual_res_n[end])
 
     ## Flatten ADMM
     reset!(root)
-    dict_prime_root_f, traj_err_f, traj_res_f, traj_opt_f, traj_com_f, traj_root_com_f = flattenADMM(root, tol=tol, λ=λₙ, max_iter=max_iter, dict_result=dict_result)
+    dict_prime_root_f, traj_err_f, traj_res_f, traj_opt_f, traj_com_f, traj_root_com_f, traj_primal_res_f, traj_dual_res_f = flattenADMM(root, tol=tol, λ=λf, max_iter=max_iter, dict_result=dict_result, return_residuals = true)
     
     total, max_num = tt_com_iter(root)
     maxnodeiters_f = max_num["iter"]
@@ -131,9 +142,10 @@ for tp in 1:nTestTopo
     push!(tt_com["fADMM"],    total["com"])
     push!(root_com["fADMM"],  root.com_cost)
     push!(opt_gap["fADMM"],   abs(traj_opt_f[end] - opt_value) / abs(opt_value) * 100)
-    push!(primal_res["fADMM"], traj_err_f[end])
-    push!(dual_res["fADMM"],   traj_res_f[end])
+    push!(primal_res["fADMM"], traj_primal_res_f[end])
+    push!(dual_res["fADMM"],   traj_dual_res_f[end])
     push!(final_obj["fADMM"],  traj_opt_f[end])
+    print_last_residual("fADMM", traj_primal_res_f[end], traj_dual_res_f[end])
     
 
     df_hADMM = DataFrame(
@@ -142,6 +154,8 @@ for tp in 1:nTestTopo
         alg = fill("hADMM", length(traj_err)),
         primal_error = traj_err,
         dual_residual = traj_res,
+        real_primal_residual = traj_primal_res_h,
+        real_dual_residual = traj_dual_res_h,
         objective = traj_opt,
         total_communication = traj_com_h,
         root_communication = traj_root_com_h,
@@ -154,6 +168,8 @@ for tp in 1:nTestTopo
         alg = fill("nADMM", length(traj_err_n)),
         primal_error = traj_err_n,
         dual_residual = traj_res_n,
+        real_primal_residual = traj_primal_res_n,
+        real_dual_residual = traj_dual_res_n,
         objective = traj_opt_n,
         total_communication = traj_com_n,
         root_communication = traj_root_com_n,
@@ -166,6 +182,8 @@ for tp in 1:nTestTopo
         alg = fill("fADMM", length(traj_err_f)),
         primal_error = traj_err_f,
         dual_residual = traj_res_f,
+        real_primal_residual = traj_primal_res_f,
+        real_dual_residual = traj_dual_res_f,
         objective = traj_opt_f,
         total_communication = traj_com_f,
         root_communication = traj_root_com_f,

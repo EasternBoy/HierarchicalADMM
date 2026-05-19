@@ -7,9 +7,9 @@ using DataFrames
 using Plots
 using Random
 
-const nD = 6
-const nN = 30
-const N_TOPOLOGIES_TO_PLOT = 5
+const nD = 5
+const nN = 40
+const N_TOPOLOGIES_TO_PLOT = 2
 const RNG_SEED = 2026
 
 const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
@@ -89,7 +89,7 @@ function plot_metric_by_topology(df::DataFrame, topologies, metric_col::Symbol, 
         yscale = yscale,
         grid = true,
         size = (800, 600),
-        legend = :topright,
+        legend = :bottomleft,
     )
 
     for topo in topologies
@@ -139,11 +139,11 @@ function plot_gap_vs_communication(df::DataFrame, topologies, output_name::Strin
         legendfontsize = 12,
         xlabel = "Total Communication",
         ylabel = "Optimality Gap (%)",
-        xscale = :log10,
+        # xscale = :log10,
         yscale = :log10,
         grid = true,
         size = (800, 600),
-        legend = :topright,
+        legend = :bottomleft,
     )
 
     for topo in topologies
@@ -207,7 +207,7 @@ function main()
         :total_communication,
         "Total Communication",
         "TotalCommunication-vs-Iteration-RandomTopologies-D=$(nD)-N=$(nN).pdf";
-        yscale = :log10,
+        # yscale = :log10,
     )
 
     fig_gap_comm = plot_gap_vs_communication(
