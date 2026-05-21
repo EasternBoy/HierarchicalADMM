@@ -18,12 +18,19 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 20
-const nD   = 3
+const nN   = 40
+const nD   = 5
 
 const λn   = 1e-3
 const λf   = 1e-3
-const λh   = 1e-3
+const λh = let values = Float64[], current_λ = 1e-6
+    while current_λ < 1e-3
+        push!(values, current_λ)
+        current_λ *= 2
+    end
+    push!(values, 1e-3)
+    values
+end
 const tol  = 1e-4
 const max_iter = 1000
 
@@ -41,7 +48,7 @@ final_obj  = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64
 topo_arr = linknode[]
 
 
-nTestTopo = 5
+nTestTopo = 10
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
@@ -68,27 +75,47 @@ for tp in 1:nTestTopo
     assign!(root) 
     dict_result, opt_value = get_CenVars(root)
     push!(final_obj["Central"], opt_value)
+    push!(topo_arr, deepcopy(root))
 
     ## Hierarchical ADMM
-    reset!(root)
-    traj_err, traj_res, traj_opt, traj_com_h, traj_root_com_h, traj_primal_res_h, traj_dual_res_h = hADMM(root, dict_result, return_residuals = true)
-    push!(topo_arr, deepcopy(root))
-    
-    total, max_num = tt_com_iter(root)
-    maxnodeiters_h = max_num["iter"]
-    push!(node_iter["hADMM"], max_num["iter"])
-    push!(max_com["hADMM"],   max_num["com"])
-    push!(tt_com["hADMM"],    total["com"])
-    push!(root_com["hADMM"],  root.com_cost)
-    push!(opt_gap["hADMM"],   abs(traj_opt[end] - opt_value) / abs(opt_value) * 100)
-    push!(primal_res["hADMM"], traj_primal_res_h[end])
-    push!(dual_res["hADMM"],   traj_dual_res_h[end])
-    push!(final_obj["hADMM"],  traj_opt[end])
-    print_last_residual("hADMM", traj_primal_res_h[end], traj_dual_res_h[end])
+    df_hADMMs = DataFrame[]
+    for λh_current in λh
+        println("  hADMM λ = $(@sprintf("%.3e", λh_current))")
+        reset!(root)
+        traj_err, traj_res, traj_opt, traj_com_h, traj_root_com_h, traj_primal_res_h, traj_dual_res_h = hADMM(root, dict_result, λ=λh_current, return_residuals = true)
+        
+        total, max_num = tt_com_iter(root)
+        maxnodeiters_h = max_num["iter"]
+        push!(node_iter["hADMM"], max_num["iter"])
+        push!(max_com["hADMM"],   max_num["com"])
+        push!(tt_com["hADMM"],    total["com"])
+        push!(root_com["hADMM"],  root.com_cost)
+        push!(opt_gap["hADMM"],   abs(traj_opt[end] - opt_value) / abs(opt_value) * 100)
+        push!(primal_res["hADMM"], traj_primal_res_h[end])
+        push!(dual_res["hADMM"],   traj_dual_res_h[end])
+        push!(final_obj["hADMM"],  traj_opt[end])
+        print_last_residual("hADMM λ=$(@sprintf("%.3e", λh_current))", traj_primal_res_h[end], traj_dual_res_h[end])
 
-    plot!(figPrime, 0:(length(traj_err)-1), traj_err, yscale = :log10, grid = true, label = "")
-    plot!(figRes, 0:(length(traj_res)-1), traj_res, yscale = :log10, grid = true, label = "")
-    plot!(figJ, 0:(length(traj_opt)-1), abs.(traj_opt .- opt_value)/maximum(abs.(traj_opt .- opt_value)), yscale = :log10, grid = true, label = "")
+        plot!(figPrime, 0:(length(traj_err)-1), traj_err, yscale = :log10, grid = true, label = "")
+        plot!(figRes, 0:(length(traj_res)-1), traj_res, yscale = :log10, grid = true, label = "")
+        plot!(figJ, 0:(length(traj_opt)-1), abs.(traj_opt .- opt_value)/maximum(abs.(traj_opt .- opt_value)), yscale = :log10, grid = true, label = "")
+
+        push!(df_hADMMs, DataFrame(
+            topology = fill(tp, length(traj_err)),
+            iteration = 0:(length(traj_err)-1),
+            alg = fill("hADMM", length(traj_err)),
+            lambda = fill(λh_current, length(traj_err)),
+            primal_error = traj_err,
+            dual_residual = traj_res,
+            real_primal_residual = traj_primal_res_h,
+            real_dual_residual = traj_dual_res_h,
+            objective = traj_opt,
+            total_communication = traj_com_h,
+            root_communication = traj_root_com_h,
+            maxnodeiters = fill(maxnodeiters_h, length(traj_err)),
+            optimal_value = fill(opt_value, length(traj_err))
+        ))
+    end
 
     ## Nested ADMM
     reset!(root)
@@ -148,24 +175,11 @@ for tp in 1:nTestTopo
     print_last_residual("fADMM", traj_primal_res_f[end], traj_dual_res_f[end])
     
 
-    df_hADMM = DataFrame(
-        topology = fill(tp, length(traj_err)),
-        iteration = 0:(length(traj_err)-1),
-        alg = fill("hADMM", length(traj_err)),
-        primal_error = traj_err,
-        dual_residual = traj_res,
-        real_primal_residual = traj_primal_res_h,
-        real_dual_residual = traj_dual_res_h,
-        objective = traj_opt,
-        total_communication = traj_com_h,
-        root_communication = traj_root_com_h,
-        maxnodeiters = fill(maxnodeiters_h, length(traj_err)),
-        optimal_value = fill(opt_value, length(traj_err))
-    )
     df_nADMM = DataFrame(
         topology = fill(tp, length(traj_err_n)),
         iteration = 0:(length(traj_err_n)-1),
         alg = fill("nADMM", length(traj_err_n)),
+        lambda = fill(λn, length(traj_err_n)),
         primal_error = traj_err_n,
         dual_residual = traj_res_n,
         real_primal_residual = traj_primal_res_n,
@@ -180,6 +194,7 @@ for tp in 1:nTestTopo
         topology = fill(tp, length(traj_err_f)),
         iteration = 0:(length(traj_err_f)-1),
         alg = fill("fADMM", length(traj_err_f)),
+        lambda = fill(λf, length(traj_err_f)),
         primal_error = traj_err_f,
         dual_residual = traj_res_f,
         real_primal_residual = traj_primal_res_f,
@@ -191,7 +206,7 @@ for tp in 1:nTestTopo
         optimal_value = fill(opt_value, length(traj_err_f))
     )
    
-    df = vcat(df_hADMM, df_nADMM, df_fADMM)
+    df = vcat(df_hADMMs..., df_nADMM, df_fADMM)
     push!(all_trajectories, df)
     println()
 end
@@ -203,7 +218,7 @@ csv_filename = joinpath("data", "disjoint-problem", string("trajectories-D=", nD
 CSV.write(csv_filename, combined_trajectories)
 println("\nAll trajectories saved to: $csv_filename")
 
-final_rows = combine(groupby(combined_trajectories, [:topology, :alg])) do sdf 
+final_rows = combine(groupby(combined_trajectories, [:topology, :alg, :lambda])) do sdf 
     sdf[argmax(sdf.iteration), :]
 end
 
