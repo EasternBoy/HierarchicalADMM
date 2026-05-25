@@ -20,6 +20,30 @@ function Proximal_Iteration(cost_func::CostFunc, q::Union{Float64, Vector{Float6
     return f, g
 end
 
+function constrained_proximal_iteration(cost_func::CostFunc, q::Vector{Float64}, λ::Float64, x0::Vector{Float64})
+    para = cost_func.para
+    func = cost_func.val
+    w = cost_func.w
+    n = length(q)
+
+    opti = JuMP.Model(Ipopt.Optimizer)
+    set_silent(opti)
+
+    x = @variable(opti, [i = 1:n], start = x0[i])
+    slack = @variable(opti, [i = 1:n])
+
+    @constraint(opti, slack .>= x)
+    @constraint(opti, slack .>= -x)
+    @constraint(opti, local_l <= sum(x))
+    @constraint(opti, sum(x) <= local_u)
+
+    @objective(opti, Min, func(x; para = para) + w * sum(slack) + 1 / (2λ) * sum((x[i] - q[i])^2 for i in 1:n))
+
+    JuMP.optimize!(opti)
+
+    return JuMP.value.(x), 0
+end
+
 function proxAlg!(node::linknode; λ = λh)  
 
     nc        = 0
@@ -59,7 +83,7 @@ function proxAlg!(node::linknode; λ = λh)
         f, g = Proximal_Iteration(node.cost_func, q/2, λ/2)
     end
 
-    solution, iterations = node.solver(f = f, g = g, x0 = x0)
+    solution, iterations = constrained_proximal_iteration(node.cost_func, node.cost_func.q, node.cost_func.λ, x0)
 
     #Update prime variable
     if node.children === nothing #leaf node has only one

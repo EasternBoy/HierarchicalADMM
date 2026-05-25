@@ -2,13 +2,9 @@ function update_leaf!(node::linknode, query::Vector{Float64}; λ = λn)
     node.cost_func.q = query
     node.cost_func.λ = λ
 
-    f = node.cost_func
-
-    g = ProximalOperators.NormL1(node.cost_func.w)
-    
     x0 = ones(node.nV)
 
-    solution, iterations = node.solver(f = f, g = g, x0 = x0)
+    solution, iterations = constrained_proximal_iteration(node.cost_func, node.cost_func.q, node.cost_func.λ, x0)
 
     node.prime[node.ID] = solution
 end
@@ -19,13 +15,9 @@ function update_parent!(node::linknode, top_query::Vector{Float64}, query::Vecto
     node.cost_func.q = (query+top_query)/2
     node.cost_func.λ = λ/2
 
-    f = node.cost_func
-
-    g = ProximalOperators.NormL1(node.cost_func.w)
-
     x0 = ones(node.nV)
 
-    solution, iterations = node.solver(f = f, g = g, x0 = x0)
+    solution, iterations = constrained_proximal_iteration(node.cost_func, node.cost_func.q, node.cost_func.λ, x0)
 
     index = 1
     for child in node.children
@@ -39,13 +31,9 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λn)
     node.cost_func.q = query
     node.cost_func.λ = λ
 
-    f = node.cost_func
-
-    g = ProximalOperators.NormL1(node.cost_func.w)
-
     x0 = ones(node.nV)
 
-    solution, iterations = node.solver(f = f, g = g, x0 = x0)
+    solution, iterations = constrained_proximal_iteration(node.cost_func, node.cost_func.q, node.cost_func.λ, x0)
 
     index = 1
     for child in node.children

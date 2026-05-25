@@ -106,7 +106,7 @@ function assign!(node::linknode)
     node.com_cost = 0
     node.iteration = 0
     if node.children === nothing #leaf
-        node.nV = 1                       #Set dimension of variable
+        node.nV = 2                       #Set dimension of variable
         push!(node.prime, node.ID => ones(node.nV))        #Keep its prime variable
         push!(node.parent.prime, node.ID => ones(node.nV)) #Initiate a prime variable in its parent
         push!(node.parent.dual,  node.ID => ones(node.nV)) #Initiate a dual variable in its parent

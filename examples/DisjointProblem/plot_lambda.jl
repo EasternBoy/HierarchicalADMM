@@ -8,8 +8,8 @@ using Plots
 using Printf
 using Random
 
-const nD = 5
-const nN = 40
+const nD = 3
+const nN = 20
 const N_TOPOLOGIES_TO_PLOT = 1
 const RNG_SEED = 2026
 

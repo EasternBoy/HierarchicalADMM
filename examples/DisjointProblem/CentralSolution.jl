@@ -50,6 +50,7 @@ function getCostFunction!(node::linknode, dict::Dict, J::Vector{NonlinearExpr}, 
     varName = String[]
     getVarName!(node, varName)
     # vec_vars = [dict[name] for name in varName]
+    
     vec_vars = []
     for name in varName append!(vec_vars, dict[name]) end 
 
@@ -63,6 +64,8 @@ function getCostFunction!(node::linknode, dict::Dict, J::Vector{NonlinearExpr}, 
 
     @constraint(opti,  slack .>=  vec_vars)
     @constraint(opti,  slack .>= -vec_vars)
+    @constraint(opti,  local_l <= sum(vec_vars))
+    @constraint(opti,  sum(vec_vars) <= local_u)
 
     push!(J, func(vec_vars; para = para) + w*sum(slack))
     if node.children !== nothing

@@ -6,17 +6,17 @@ using CSV
 using DataFrames
 using Plots
 using Printf
-using Random
+using Random               
 
-const nD = 5
-const nN = 40
-const N_TOPOLOGIES_TO_PLOT = 2
+const nD = 3
+const nN = 20
+const N_TOPOLOGIES_TO_PLOT = 1
 const RNG_SEED = 2026
 
 const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
 const FIG_DIR = joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem")
 const TRAJECTORY_FILE = joinpath(DATA_DIR, "trajectories-D=$(nD)-N=$(nN).csv")
-const SELECTED_LAMBDA = 2.56e-4
+const SELECTED_LAMBDA = 1.0e-3
 
 const ALG_ORDER = ["hADMM", "fADMM"]
 const ALG_LINESTYLE = Dict(

@@ -16,6 +16,7 @@ end
 function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict, dict_dual::Dict, pos::Dict, nV::Dict; λ = λf)
     para = root.cost_func.para
     func = root.cost_func.val
+    w = root.cost_func.w
 
     query = Dict()
     for (key, value) in dict_prime_child   
@@ -27,16 +28,27 @@ function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_chi
         index[key] = value:(value + nV[key] - 1)
     end
 
-    f = ProximalAlgorithms.AutoDifferentiable(
-        v -> func(v; para = para) + sum((1/(2λ))*dot(v[index[key]] - query[key], v[index[key]] - query[key]) for (key, value) in query),
-        AutoZygote()
+    opti = JuMP.Model(Ipopt.Optimizer)
+    set_silent(opti)
+
+    x = @variable(opti, [i = 1:root.nV], start = 1.0)
+    slack = @variable(opti, [i = 1:root.nV])
+
+    @constraint(opti, slack .>= x)
+    @constraint(opti, slack .>= -x)
+    @constraint(opti, local_l <= sum(x))
+    @constraint(opti, sum(x) <= local_u)
+
+    @objective(
+        opti,
+        Min,
+        func(x; para = para) +
+        w * sum(slack) +
+        sum((1 / (2λ)) * sum((x[i] - query[key][i - first(index[key]) + 1])^2 for i in index[key]) for key in keys(query))
     )
 
-    g = ProximalOperators.NormL1(root.cost_func.w)
-
-    x0 = ones(root.nV)
-
-    solution, iterations = root.solver(f = f, g = g, x0 = x0)
+    JuMP.optimize!(opti)
+    solution = JuMP.value.(x)
 
     for (key, value) in dict_prime_root
         dict_prime_root[key] = solution[index[key]]
@@ -45,18 +57,8 @@ end
 
 
 function update_leaf_flat(node::linknode, query::Vector{Float64}, λ = λf)
-    para = node.cost_func.para
-    func = node.cost_func.val
-
-    f = ProximalAlgorithms.AutoDifferentiable(
-        v -> func(v; para = para) + (1/(2λ))*dot(v - query, v - query),
-        AutoZygote()
-    )
-
-    g = ProximalOperators.NormL1(node.cost_func.w)
-
     x0 = ones(node.nV)
-    solution, iterations = node.solver(f = f, g = g, x0 = x0)
+    solution, iterations = constrained_proximal_iteration(node.cost_func, query, λ, x0)
 
     return solution
 end
