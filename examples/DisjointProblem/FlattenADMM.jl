@@ -5,158 +5,26 @@ function collect_nodes!(node::linknode, flatten_nodes)
             collect_nodes!(child, flatten_nodes)
         end
     elseif node.parent !== nothing
-        # Leaf node
         push!(flatten_nodes, node.ID => node)
-    else
-        # Do not add root node
     end
 end
 
-
-function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict, dict_dual::Dict, pos::Dict, nV::Dict; λ = λf)
-    para = root.cost_func.para
-    func = root.cost_func.val
-    w = root.cost_func.w
-
-    query = Dict()
-    for (key, value) in dict_prime_child   
-        query[key] = value - dict_dual[key] 
-    end
-
-    index = Dict()
-    for (key, value) in pos 
-        index[key] = value:(value + nV[key] - 1)
-    end
-
-    opti = JuMP.Model(Ipopt.Optimizer)
-    set_silent(opti)
-
-    x = @variable(opti, [i = 1:root.nV], start = 1.0)
-    slack = @variable(opti, [i = 1:root.nV])
-
-    @constraint(opti, slack .>= x)
-    @constraint(opti, slack .>= -x)
-    @constraint(opti, local_l <= sum(x))
-    @constraint(opti, sum(x) <= local_u)
-
-    @objective(
-        opti,
-        Min,
-        func(x; para = para) +
-        w * sum(slack) +
-        sum((1 / (2λ)) * sum((x[i] - query[key][i - first(index[key]) + 1])^2 for i in index[key]) for key in keys(query))
-    )
-
-    JuMP.optimize!(opti)
-    solution = JuMP.value.(x)
-
-    for (key, value) in dict_prime_root
-        dict_prime_root[key] = solution[index[key]]
-    end
+function flatten_solution_snapshot(root::linknode)
+    snapshot = Dict()
+    collect_solution_snapshot!(root, snapshot)
+    return snapshot
 end
 
-
-function update_leaf_flat(node::linknode, query::Vector{Float64}, λ = λf)
-    x0 = ones(node.nV)
-    solution, iterations = constrained_proximal_iteration(node.cost_func, query, λ, x0)
-
-    return solution
-end
-
-function get_path(node::linknode)
-    path    = [node]
-    pointer = node
-
-    while pointer.parent !== nothing #path to root
-        pointer = pointer.parent
-        push!(path, pointer)
-    end
-    return reverse(path)
-end
-
-function getPath!(node::linknode, allPaths::Dict)
-    if node.parent !== nothing
-        path = get_path(node)
-        allPaths[node.ID] = path
-    end
-
+function collect_solution_snapshot!(node::linknode, snapshot::Dict)
+    snapshot[node.ID] = vect_prime(node)
     if node.children !== nothing
         for child in node.children
-            getPath!(child, allPaths)
+            collect_solution_snapshot!(child, snapshot)
         end
     end
 end
 
-function get_postion(path::Vector{linknode})
-
-    path_length = length(path)
-    start_index = 1
-
-    # println(path_length)
-
-    for i in 1:path_length-1
-        # println("i = $i, node $(path[i].ID) to node $(path[i+1].ID)")
-        for child in path[i].children
-            if child !== path[i+1]
-                start_index += child.nV
-            else
-                break
-            end
-        end
-    end
-
-    return start_index
-end
-
-function assign_flat_solution!(node::linknode, dict_prime_child::Dict)
-    if node.children === nothing
-        node.prime[node.ID] = dict_prime_child[node.ID]
-        return
-    end
-
-    local_solution = dict_prime_child[node.ID]
-    index = 1
-    for child in node.children
-        node.prime[child.ID] = local_solution[index:index + child.nV - 1]
-        index += child.nV
-        assign_flat_solution!(child, dict_prime_child)
-    end
-end
-
-function write_flat_solution!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict)
-    for child in root.children
-        root.prime[child.ID] = dict_prime_root[child.ID]
-        assign_flat_solution!(child, dict_prime_child)
-    end
-end
-
-
-
-function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter, dict_result = nothing, return_residuals = false)
-
-    # Flatten the tree structure into a list of nodes
-    dict_prime_child = Dict()
-    dict_prime_root  = Dict()
-    dict_dual        = Dict()
-    
-    flatten_tree = Dict()
-    collect_nodes!(root, flatten_tree)
-
-    path = Dict()
-    getPath!(root, path)
-
-    pos = Dict()
-    nV  = Dict()
-
-    for (key, value) in flatten_tree
-        dict_prime_root[key]  = ones(value.nV)
-        dict_prime_child[key] = ones(value.nV)
-        dict_dual[key]        = ones(value.nV)
-        pos[key]              = get_postion(path[key])
-        nV[key]               = value.nV
-    end
-
-    # Track trajectories
+function flattenADMM(root::linknode; tol = tol, λ = λf, max_iter = max_iter, dict_result = nothing, return_residuals = false)
     traj_err = Float64[]
     traj_res = Float64[]
     traj_primal_res = Float64[]
@@ -177,45 +45,22 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
         push!(traj_err, sum(initial_err))
     end
 
-    # Initialize the query vector
     for iteration in 1:max_iter
-
-        root.iteration += 1 #Add 1 iteration in root
-        prev_prime_root = Dict(key => copy(value) for (key, value) in dict_prime_root)
-
-        update_root_flat!(root, dict_prime_root, dict_prime_child, dict_dual, pos, nV; λ = λ)
-
         ter = Float64[]
-        # Iterate through the nodes to solve the optimization problem
-        for (key, value) in flatten_tree
-            value.iteration += 1 #Add 1 iteration in a child
+        prev_parent_primes = Dict()
+        snapshot_edge_parent_primes!(root, prev_parent_primes)
 
-            query = dict_prime_root[key] + dict_dual[key]
+        hierarchicalADMM!(root, ter; λ = λ)
 
-            com_cost!(path[key], query, 1) #Communication from root to child
-            dict_prime_child[key] = update_leaf_flat(value, query, λ)
-
-            res = dict_prime_root[key] - dict_prime_child[key]
-            dict_dual[key] += res
-
-            push!(ter, maximum(abs.(res)))
-            com_cost!(reverse(path[key]), dict_prime_child[key], 1) #Communication from child to root to compute dual variable located in root
-        end
-
-        # Update the entire tree structure with the new solutions
-        write_flat_solution!(root, dict_prime_root, dict_prime_child)
-
-        # Track metrics AFTER updating all node.prime values
         push!(traj_opt, total_cost(root))
         push!(traj_res, maximum(ter))
-        push!(traj_primal_res, maximum(ter))
-        push!(traj_dual_res, maximum(maximum(abs.(dict_prime_root[key] - prev_prime_root[key])) for key in keys(dict_prime_root)))
-        
-        # Track total communication after this iteration
+        push!(traj_primal_res, max_primal_residual(root))
+        push!(traj_dual_res, max_dual_residual(root, prev_parent_primes))
+
         total, _ = tt_com_iter(root)
         push!(traj_com, total["com"])
         push!(traj_root_com, root.com_cost)
-        
+
         if dict_result !== nothing
             err = Float64[]
             get_err!(root, dict_result, err)
@@ -227,6 +72,8 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter,
             break
         end
     end
+
+    dict_prime_root = flatten_solution_snapshot(root)
 
     if return_residuals
         return dict_prime_root, traj_err, traj_res, traj_opt, traj_com, traj_root_com, traj_primal_res, traj_dual_res

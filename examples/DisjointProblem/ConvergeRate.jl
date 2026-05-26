@@ -103,62 +103,48 @@ function topo_matrix(root::linknode, nD, A, B)
 end
 
 function A_B_d(root::linknode, d::Int64)
-    Ad = nothing
-    Bd = nothing
-
     SLnode_arr = linknode[]
+    next_level_nodes = linknode[]
 
     get_same_level_nodes(root, SLnode_arr, d)
+    get_same_level_nodes(root, next_level_nodes, d + 1)
 
+    parent_offsets = Dict{String, Int}()
+    offset = 0
+    for node in SLnode_arr
+        parent_offsets[node.ID] = offset
+        offset += node.nV
+    end
+
+    child_offsets = Dict{String, Int}()
+    offset = 0
+    for node in next_level_nodes
+        child_offsets[node.ID] = offset
+        offset += node.nV
+    end
+
+    rows = Tuple{linknode, linknode, Int}[]
     for node in SLnode_arr
         if node.children !== nothing
-            if Ad === nothing
-                Ad = Adi(node)
-            else
-                Ad = blockdiag(Ad, Adi(node))
-            end
-            
-            for child in node.children
-                if child.children !== nothing
-                    if Bd === nothing
-                        Bd = - spdiagm(ones(child.nV))
-                    else
-                        Bd = blockdiag(Bd, - spdiagm(ones(child.nV)))
-                    end
-                end
-                
-                if child.children === nothing
-                    if Bd === nothing
-                        Bd = - spdiagm(ones(child.nV))
-                    else
-                        Bd = blockdiag(Bd, - spdiagm(ones(child.nV)))
-                    end
-                end
+            for (idx, child) in enumerate(node.children)
+                push!(rows, (node, child, idx))
             end
         end
     end
 
-    for node in SLnode_arr
-        if node.children === nothing
-            Ad = [Ad spzeros(size(Ad,1), node.nV)]
+    Ad = spzeros(length(rows), sum(node.nV for node in SLnode_arr))
+    Bd = spzeros(length(rows), sum(node.nV for node in next_level_nodes))
+
+    for (row, edge) in enumerate(rows)
+        node, child, child_index = edge
+        Ad[row, parent_offsets[node.ID] + child_index] = 1.0
+        child_start = child_offsets[child.ID] + 1
+        for col in child_start:(child_start + child.nV - 1)
+            Bd[row, col] = -1.0
         end
     end
 
     return Matrix(Ad), Matrix(Bd)
-end
-
-function Adi(node::linknode)
-    A = nothing
-
-    for child in node.children
-        if A === nothing
-            A =  spdiagm(ones(child.nV))
-        else
-            A = [A; spdiagm(ones(child.nV))]
-        end
-    end
-
-    return A
 end
 
 

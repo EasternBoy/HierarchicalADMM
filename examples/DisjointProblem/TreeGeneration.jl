@@ -101,29 +101,30 @@ function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
 end
 
 
-# for specail casese #variables = #dual = #prime (no local variables)
+# Aggregation problem:
+#   x_parent[k] = sum(x_child) for the kth child of a parent.
+# Internal-node dimensions are therefore the number of children, not the
+# concatenated dimension of the whole subtree.
 function assign!(node::linknode)
     node.com_cost = 0
     node.iteration = 0
     if node.children === nothing #leaf
         node.nV = 2                       #Set dimension of variable
         push!(node.prime, node.ID => ones(node.nV))        #Keep its prime variable
-        push!(node.parent.prime, node.ID => ones(node.nV)) #Initiate a prime variable in its parent
-        push!(node.parent.dual,  node.ID => ones(node.nV)) #Initiate a dual variable in its parent
+        push!(node.parent.prime, node.ID => ones(1))       #Parent aggregate for this child
+        push!(node.parent.dual,  node.ID => ones(1))       #Dual for parent aggregate - sum(child)
 
         node.cost_func = CostFunc(cost_func_leaf, grad_cost_leaf, (parse(Float64, node.ID))) #cost + its grad + parameters
     else
         for child in node.children
             assign!(child) #go to next layer
-            push!(node.prime, child.ID => ones(child.nV)) #when next layers are initiated, push a prime variable
-            push!(node.dual,  child.ID => ones(child.nV)) #when next layers are initiated, push a dual variable
+            push!(node.prime, child.ID => ones(1)) #one aggregate scalar per child
+            push!(node.dual,  child.ID => ones(1)) #one dual scalar per child
         end
-        for (x,y) in node.prime
-            node.nV += length(y) #calculate total number of variables
-        end
+        node.nV = length(node.children)
         if node.parent !== nothing #parent
-            push!(node.parent.prime, node.ID => ones(node.nV)) #initiate a prime variable in its parent
-            push!(node.parent.dual,  node.ID => ones(node.nV)) #initiate a dual variable in its parent
+            push!(node.parent.prime, node.ID => ones(1)) #aggregate scalar in parent
+            push!(node.parent.dual,  node.ID => ones(1)) #dual scalar in parent
 
             node.cost_func = CostFunc(cost_func_parent, grad_cost_parent, (parse(Float64, node.ID))) #cost + its grad + parameters
         else #root

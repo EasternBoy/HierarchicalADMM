@@ -52,7 +52,7 @@ function max_primal_residual(node::linknode)
 
     if node.children !== nothing
         for child in node.children
-            res = node.prime[child.ID] - vect_prime(child)
+            res = edge_residual(node, child)
             max_res = max(max_res, maximum(abs.(res)))
             max_res = max(max_res, max_primal_residual(child))
         end

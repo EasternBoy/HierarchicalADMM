@@ -1,11 +1,9 @@
 function get_CenVars(root::linknode)
-    varName = String[]
-    getVarName!(root,varName)
-    
     dict = Dict()
     opti = JuMP.Model(Ipopt.Optimizer)
     set_silent(opti)
     setVariables!(root, dict, opti)
+    setAggregationConstraints!(root, dict, opti)
     
     J = NonlinearExpr[]
     getCostFunction!(root, dict, J, opti)
@@ -26,13 +24,22 @@ function get_CenVars(root::linknode)
 end
 
 function setVariables!(node::linknode, dict::Dict, opti)
+    dict[string("x",node.ID)] = @variable(opti, [i=1:node.nV], base_name = string("x",node.ID))
     if node.children !== nothing
         for child in node.children
             setVariables!(child, dict, opti)
         end
-    else
-        dict[string("x",node.ID)] = @variable(opti, [i=1:node.nV], base_name = string("x",node.ID))
-        # dict[string("x",node.ID)] = @variable(opti, base_name = string("x",node.ID))
+    end
+end
+
+function setAggregationConstraints!(node::linknode, dict::Dict, opti)
+    if node.children !== nothing
+        parent_var = dict[string("x", node.ID)]
+        for (idx, child) in enumerate(node.children)
+            child_var = dict[string("x", child.ID)]
+            @constraint(opti, parent_var[idx] == sum(child_var))
+            setAggregationConstraints!(child, dict, opti)
+        end
     end
 end
 
@@ -47,12 +54,7 @@ function getVarName!(node::linknode, str::Vector{String})
 end
 
 function getCostFunction!(node::linknode, dict::Dict, J::Vector{NonlinearExpr}, opti)
-    varName = String[]
-    getVarName!(node, varName)
-    # vec_vars = [dict[name] for name in varName]
-    
-    vec_vars = []
-    for name in varName append!(vec_vars, dict[name]) end 
+    vec_vars = dict[string("x", node.ID)]
 
     para = node.cost_func.para
     func = node.cost_func.val
@@ -77,14 +79,11 @@ end
 
 
 function assign_result!(node::linknode, dict::Dict, dict_res::Dict)
+    dict[node.ID] = dict_res[string("x",node.ID)]
     if node.children !== nothing
-        dict[node.ID] = Float64[]
         for child in node.children
             assign_result!(child, dict, dict_res::Dict)
-            dict[node.ID] = [dict[node.ID]; dict[child.ID]]
         end
-    else
-        dict[node.ID] = dict_res[string("x",node.ID)]
     end
 end
 

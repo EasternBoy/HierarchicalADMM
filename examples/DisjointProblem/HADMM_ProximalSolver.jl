@@ -1,21 +1,19 @@
 #Vectorize prime dict of a node in the same order as its children
 function ProximalAlgorithms.value_and_gradient(cost_func::CostFunc, x)
-    prm  = cost_func.para
-    q = cost_func.q 
+    prm = cost_func.para
+    q = cost_func.q
     λ = cost_func.λ
 
-    val  = cost_func.val(x; para = prm)  + 1/(2λ)*dot(x - q, x - q)
-    grad = cost_func.grad(x; para = prm) + 1/λ*(x - q)
+    val = cost_func.val(x; para = prm) + 1 / (2λ) * dot(x - q, x - q)
+    grad = cost_func.grad(x; para = prm) + 1 / λ * (x - q)
     return val, grad
 end
 
 function Proximal_Iteration(cost_func::CostFunc, q::Union{Float64, Vector{Float64}}, λ::Float64)
-
     cost_func.q = q
     cost_func.λ = λ
 
     f = cost_func
-
     g = ProximalOperators.NormL1(cost_func.w)
     return f, g
 end
@@ -44,81 +42,76 @@ function constrained_proximal_iteration(cost_func::CostFunc, q::Vector{Float64},
     return JuMP.value.(x), 0
 end
 
-function proxAlg!(node::linknode; λ = λh)  
+function edge_residual(parent::linknode, child::linknode)
+    return parent.prime[child.ID] .- sum(vect_prime(child))
+end
 
-    nc        = 0
-    q         = Float64[]
-    x0        = vect_prime(node)
-    
-    if node.children === nothing #Leaf nodes
-        q = node.parent.prime[node.ID] + node.parent.dual[node.ID] #query
+function constrained_aggregation_iteration(node::linknode; λ = λh)
+    para = node.cost_func.para
+    func = node.cost_func.val
+    w = node.cost_func.w
+    n = node.nV
 
-        com_cost!(node.parent, q, 1) #Parent sent to node
+    opti = JuMP.Model(Ipopt.Optimizer)
+    set_silent(opti)
 
-        f, g = Proximal_Iteration(node.cost_func, q, λ)
-    elseif node.parent === nothing #Root node
-        nc = length(node.children)
+    x0 = vect_prime(node)
+    x = @variable(opti, [i = 1:n], start = x0[i])
+    slack = @variable(opti, [i = 1:n])
 
-        for i in 1:nc
-            qc = vect_prime(node.children[i]) - node.dual[node.children[i].ID]
-            q  = [q; qc]
-        end
+    @constraint(opti, slack .>= x)
+    @constraint(opti, slack .>= -x)
+    @constraint(opti, local_l <= sum(x))
+    @constraint(opti, sum(x) <= local_u)
 
-        f, g = Proximal_Iteration(node.cost_func, q, λ)
-    else #Middle node
-        nc = length(node.children)
+    penalty = zero(AffExpr)
 
-        par  = node.parent.prime[node.ID] + node.parent.dual[node.ID]
-
-        com_cost!(node.parent, par, 1) #Parent sent to node
-
-        ch_pr = Float64[]
-        for i in 1:nc
-            qc = vect_prime(node.children[i])
-            ch_pr = [ch_pr; qc]
-        end
-        
-
-        q = [q; par - vect_dual(node) + ch_pr]
-        f, g = Proximal_Iteration(node.cost_func, q/2, λ/2)
+    if node.parent !== nothing
+        top_query = node.parent.prime[node.ID][1] + node.parent.dual[node.ID][1]
+        penalty += (sum(x) - top_query)^2
+        com_cost!(node.parent, [top_query], 1)
     end
 
-    solution, iterations = constrained_proximal_iteration(node.cost_func, node.cost_func.q, node.cost_func.λ, x0)
+    if node.children !== nothing
+        for (idx, child) in enumerate(node.children)
+            child_query = sum(vect_prime(child)) - node.dual[child.ID][1]
+            penalty += (x[idx] - child_query)^2
+        end
+    end
 
-    #Update prime variable
-    if node.children === nothing #leaf node has only one
+    @objective(opti, Min, func(x; para = para) + w * sum(slack) + 1 / (2λ) * penalty)
+
+    JuMP.optimize!(opti)
+
+    return JuMP.value.(x), 0
+end
+
+function proxAlg!(node::linknode; λ = λh)
+    solution, iterations = constrained_aggregation_iteration(node; λ = λ)
+
+    if node.children === nothing
         node.prime[node.ID] = solution
     else
-        dc = [node.children[i].nV for i in 1:nc]
-        index = 1
-        for i in 1:nc
-            ID = node.children[i].ID
-            node.prime[ID] = solution[index:(index + dc[i]-1)]
-            index += dc[i]
+        for (idx, child) in enumerate(node.children)
+            node.prime[child.ID] = [solution[idx]]
         end
     end
 end
 
-
 function hierarchicalADMM!(node::linknode, ter::Vector{Float64}; λ = λh)
-
     node.iteration += 1
-    
-    #Update prime
+
     proxAlg!(node; λ = λ)
 
     if node.children !== nothing
         for child in node.children
             hierarchicalADMM!(child, ter; λ = λ)
-            #Update dual
+
             child_prime = vect_prime(child)
-            res = node.prime[child.ID] - child_prime
+            res = edge_residual(node, child)
             node.dual[child.ID] += res
 
-            # Child sent its prime var to node
             com_cost!(child, child_prime, 1)
-
-            #Take the maximum residual error for stopping criteria
             push!(ter, maximum(abs.(res)))
         end
     end
@@ -129,7 +122,7 @@ function max_primal_residual(node::linknode)
 
     if node.children !== nothing
         for child in node.children
-            res = node.prime[child.ID] - vect_prime(child)
+            res = edge_residual(node, child)
             max_res = max(max_res, maximum(abs.(res)))
             max_res = max(max_res, max_primal_residual(child))
         end
@@ -162,10 +155,9 @@ function max_dual_residual(node::linknode, prev_parent_primes::Dict)
     return max_res
 end
 
-
 function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λh, max_iter = max_iter, return_residuals = false)
     global stop_arr
-    
+
     traj_err = Float64[]
     traj_res = Float64[]
     traj_primal_res = Float64[]
@@ -183,7 +175,7 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λh, max_iter 
     push!(opt_value, total_cost(root))
     push!(traj_com, 0.0)
     push!(traj_root_com, 0.0)
-    
+
     for iteration in 1:max_iter
         ter = Float64[]
         prev_parent_primes = Dict()
@@ -198,8 +190,7 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λh, max_iter 
         push!(traj_primal_res, max_primal_residual(root))
         push!(traj_dual_res, max_dual_residual(root, prev_parent_primes))
         push!(traj_err, sum(err))
-        
-        # Track total communication after this iteration
+
         total, _ = tt_com_iter(root)
         push!(traj_com, total["com"])
         push!(traj_root_com, root.com_cost)
@@ -218,49 +209,3 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λh, max_iter 
     end
     return traj_err, traj_res, opt_value, traj_com, traj_root_com
 end
-
-# function forward_hierarchicalADMM!(root::linknode; max_nlayer = 10)
-#     #Update prime 
-#     VecLink = [root]
-
-#     for _ in 1:max_nlayer #maximum layer is 10
-#         if !isempty(VecLink)
-#             newVecLink = linknode[]
-#             for node in VecLink
-#                 prox!(node)
-#                 if node.children !== nothing
-#                     for child in node.children
-#                         push!(newVecLink, child)
-#                     end
-#                 end
-#             end
-#             VecLink = newVecLink
-#         end
-#     end
-# end
-
-
-# function backward_hierarchicalADMM!(root::linknode, ter::Vector{Float64};  max_nlayer = 10)
-#     VecLink = [root]
-
-#     for _ in 1:max_nlayer #maximum layer is 10
-#         if !isempty(VecLink)
-#             newVecLink = linknode[]
-#             max_abs = 0
-#             for node in VecLink
-#                 if node.children !== nothing
-#                     for child in node.children
-#                         res = node.prime[child.ID] - vect_prime(child)
-#                         node.dual[child.ID] = node.dual[child.ID] + res
-#                         max_abs = (max_abs > maximum(abs.(res))) ? max_abs : maximum(abs.(res))
-#                         push!(ter, max_abs)
-#                         if child.children !== nothing
-#                             push!(newVecLink, child)
-#                         end
-#                     end
-#                 end
-#             end
-#             VecLink = newVecLink
-#         end
-#     end
-# end
