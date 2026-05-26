@@ -87,7 +87,7 @@ function plot_metric_by_topology(df::DataFrame, topologies, metric_col::Symbol, 
             title = "Topology $topo",
             yscale = yscale,
             grid = true,
-            legend = :bottomright,
+            legend = :topright,
         )
 
         for (lambda_index, lambda_value) in enumerate(lambdas)

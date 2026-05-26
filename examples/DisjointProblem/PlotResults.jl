@@ -10,13 +10,13 @@ using Random
 
 const nD = 3
 const nN = 20
-const N_TOPOLOGIES_TO_PLOT = 1
+const N_TOPOLOGIES_TO_PLOT = 2
 const RNG_SEED = 2026
 
 const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
 const FIG_DIR = joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem")
 const TRAJECTORY_FILE = joinpath(DATA_DIR, "trajectories-D=$(nD)-N=$(nN).csv")
-const SELECTED_LAMBDA = 1.0e-3
+const SELECTED_LAMBDA = 3.2e-4
 
 const ALG_ORDER = ["hADMM", "fADMM"]
 const ALG_LINESTYLE = Dict(
@@ -181,7 +181,7 @@ function plot_gap_vs_communication(df::DataFrame, topologies, output_name::Strin
         yscale = :log10,
         grid = true,
         size = (800, 600),
-        legend = :bottomleft,
+        legend = :topright,
     )
 
     for topo in topologies
