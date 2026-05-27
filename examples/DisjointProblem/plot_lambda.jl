@@ -9,15 +9,15 @@ using Printf
 using Random
 
 const nD = 3
-const nN = 20
+const nN = 9
 const N_TOPOLOGIES_TO_PLOT = 1
 const RNG_SEED = 2026
 
 const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
 const FIG_DIR = joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem")
-const TRAJECTORY_FILE = joinpath(DATA_DIR, "trajectories-D=$(nD)-N=$(nN).csv")
+const TRAJECTORY_FILE = joinpath(DATA_DIR, "balance_tree-D=$(nD)-N=$(nN).csv")
 
-const TARGET_ALG = "hADMM"
+const TARGET_ALGS = ["hADMM", "fADMM"]
 const LAMBDA_COLORS = [
     "#0057B8", # blue
     "#D7191C", # red
@@ -56,7 +56,7 @@ function available_lambdas(df::DataFrame)
         return [NaN]
     end
 
-    return sort(unique(collect(skipmissing(df.lambda))))
+    return sort(filter(isfinite, unique(collect(skipmissing(df.lambda)))))
 end
 
 function lambda_color(lambda_index::Int)
@@ -72,8 +72,39 @@ function lambda_label(lambda_value::Real)
     return "lambda=$(@sprintf("%.1e", lambda_value))"
 end
 
-function plot_metric_by_topology(df::DataFrame, topologies, metric_col::Symbol, ylabel::String, output_name::String; yscale = :identity)
-    lambdas = available_lambdas(filter(row -> row.alg == TARGET_ALG, df))
+function metric_series(df::DataFrame, topology::Integer, alg::String, lambda_value::Real, metric_col::Symbol)
+    subdf = filter(row -> row.topology == topology && row.alg == alg && row.lambda == lambda_value, df)
+    sort!(subdf, :iteration)
+    return subdf
+end
+
+function warn_identical_algorithm_series(df::DataFrame, topologies, metric_cols::Vector{Symbol})
+    length(TARGET_ALGS) < 2 && return
+
+    for topo in topologies
+        common_lambdas = intersect((available_lambdas(filter(row -> row.alg == alg, df)) for alg in TARGET_ALGS)...)
+        for lambda_value in common_lambdas
+            for metric_col in metric_cols
+                reference = metric_series(df, topo, TARGET_ALGS[1], lambda_value, metric_col)
+                nrow(reference) == 0 && continue
+
+                for alg in TARGET_ALGS[2:end]
+                    candidate = metric_series(df, topo, alg, lambda_value, metric_col)
+                    nrow(candidate) == nrow(reference) || continue
+
+                    same_iterations = candidate.iteration == reference.iteration
+                    same_values = candidate[!, metric_col] == reference[!, metric_col]
+                    if same_iterations && same_values
+                        println("Warning: $(TARGET_ALGS[1]) and $alg have identical $metric_col series for topology $topo, $(lambda_label(lambda_value)).")
+                    end
+                end
+            end
+        end
+    end
+end
+
+function plot_metric_by_topology(df::DataFrame, topologies, target_alg::String, metric_col::Symbol, ylabel::String, output_name::String; yscale = :identity)
+    lambdas = available_lambdas(filter(row -> row.alg == target_alg, df))
     topo_figs = []
 
     for topo in topologies
@@ -84,14 +115,14 @@ function plot_metric_by_topology(df::DataFrame, topologies, metric_col::Symbol, 
             legendfontsize = 10,
             xlabel = "Iteration",
             ylabel = ylabel,
-            title = "Topology $topo",
+            title = "$target_alg",
             yscale = yscale,
             grid = true,
             legend = :topright,
         )
 
         for (lambda_index, lambda_value) in enumerate(lambdas)
-            subdf = filter(row -> row.topology == topo && row.alg == TARGET_ALG && row.lambda == lambda_value, df)
+            subdf = filter(row -> row.topology == topo && row.alg == target_alg && row.lambda == lambda_value, df)
 
             if nrow(subdf) == 0
                 continue
@@ -128,60 +159,6 @@ function plot_metric_by_topology(df::DataFrame, topologies, metric_col::Symbol, 
     return fig
 end
 
-# function plot_gap_vs_communication(df::DataFrame, topologies, output_name::String)
-#     lambdas = available_lambdas(filter(row -> row.alg == TARGET_ALG, df))
-#     topo_figs = []
-
-#     for topo in topologies
-#         topo_fig = plot(
-#             framestyle = :box,
-#             guidefont = font(16),
-#             tickfontsize = 14,
-#             legendfontsize = 10,
-#             xlabel = "Total Communication",
-#             ylabel = "Optimality Gap (%)",
-#             title = "Topology $topo",
-#             # xscale = :log10,
-#             yscale = :log10,
-#             grid = true,
-#             legend = :bottomright,
-#         )
-
-#         for (lambda_index, lambda_value) in enumerate(lambdas)
-#             subdf = filter(row -> row.topology == topo && row.alg == TARGET_ALG && row.lambda == lambda_value, df)
-
-#             if nrow(subdf) == 0
-#                 continue
-#             end
-
-#             sort!(subdf, :iteration)
-#             x_values = max.(subdf.total_communication, eps(Float64))
-#             y_values = max.(subdf.objective_gap, eps(Float64))
-
-#             plot!(
-#                 topo_fig,
-#                 x_values,
-#                 y_values,
-#                 color = lambda_color(lambda_index),
-#                 linestyle = lambda_linestyle(lambda_index),
-#                 linewidth = 2.5,
-#                 alpha = 1.0,
-#                 label = lambda_label(lambda_value),
-#             )
-#         end
-
-#         push!(topo_figs, topo_fig)
-#     end
-
-#     fig = plot(
-#         topo_figs...,
-#         layout = (length(topo_figs), 1),
-#         size = (800, max(600, 350 * length(topo_figs))),
-#     )
-#     savefig(fig, joinpath(FIG_DIR, output_name))
-#     return fig
-# end
-
 function main()
     if !isfile(TRAJECTORY_FILE)
         error("Trajectory CSV not found: $TRAJECTORY_FILE")
@@ -197,34 +174,39 @@ function main()
 
     topologies = sampled_topologies(df)
     println("Plotting topologies: ", topologies)
+    warn_identical_algorithm_series(df, topologies, [:objective_gap, :total_communication])
 
-    fig_gap = plot_metric_by_topology(
-        df,
-        topologies,
-        :objective_gap,
-        "Optimality Gap (%)",
-        "OptGap-vs-Iteration-RandomTopologies-D=$(nD)-N=$(nN).pdf";
-        yscale = :log10,
-    )
+    for target_alg in TARGET_ALGS
+        if !any(row -> row.alg == target_alg, eachrow(df))
+            println("Skipping $target_alg: no rows found")
+            continue
+        end
 
-    fig_comm = plot_metric_by_topology(
-        df,
-        topologies,
-        :total_communication,
-        "Total Communication",
-        "TotalCommunication-vs-Iteration-RandomTopologies-D=$(nD)-N=$(nN).pdf";
-        # yscale = :log10,
-    )
+        println("Plotting algorithm: ", target_alg)
 
-    # fig_gap_comm = plot_gap_vs_communication(
-    #     df,
-    #     topologies,
-    #     "OptGap-vs-TotalCommunication-RandomTopologies-D=$(nD)-N=$(nN).pdf",
-    # )
+        fig_gap = plot_metric_by_topology(
+            df,
+            topologies,
+            target_alg,
+            :objective_gap,
+            "Optimality Gap (%)",
+            "OptGap-vs-Iteration-RandomTopologies-$(target_alg)-D=$(nD)-N=$(nN).pdf";
+            yscale = :log10,
+        )
 
-    display(fig_gap)
-    display(fig_comm)
-    # display(fig_gap_comm)
+        fig_comm = plot_metric_by_topology(
+            df,
+            topologies,
+            target_alg,
+            :total_communication,
+            "Total Communication",
+            "TotalCommunication-vs-Iteration-RandomTopologies-$(target_alg)-D=$(nD)-N=$(nN).pdf";
+            # yscale = :log10,
+        )
+
+        display(fig_gap)
+        display(fig_comm)
+    end
 
     println("Figures saved to: ", FIG_DIR)
 end

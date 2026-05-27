@@ -120,3 +120,42 @@ function total_cost(root::linknode)
 
     return opt_cost.value
 end
+
+function aggregation_values(node::linknode, child::linknode, idx::Int; solution = nothing)
+    if solution === nothing
+        return node.prime[child.ID][1], sum(vect_prime(child))
+    end
+
+    return solution[node.ID][idx], sum(solution[child.ID])
+end
+
+function check_aggregation_constraints!(node::linknode, rows::Vector; solution = nothing)
+    if node.children !== nothing
+        for (idx, child) in enumerate(node.children)
+            parent_value, child_sum = aggregation_values(node, child, idx; solution = solution)
+            residual = parent_value - child_sum
+            push!(rows, (node.ID, child.ID, parent_value, child_sum, residual))
+            check_aggregation_constraints!(child, rows; solution = solution)
+        end
+    end
+end
+
+function print_aggregation_constraints(label::String, root::linknode; solution = nothing, digits::Int = 6)
+    rows = []
+    check_aggregation_constraints!(root, rows; solution = solution)
+
+    println("\nAggregation constraint check: $label")
+    println("  parent -> child | parent_value | sum_child | residual")
+    for (parent_id, child_id, parent_value, child_sum, residual) in rows
+        println(
+            "  $parent_id -> $child_id | ",
+            round(parent_value, digits = digits), " | ",
+            round(child_sum, digits = digits), " | ",
+            round(residual, digits = digits),
+        )
+    end
+
+    max_residual = isempty(rows) ? 0.0 : maximum(abs(row[5]) for row in rows)
+    println("  max |parent - sum(child)| = ", @sprintf("%.3e", max_residual))
+    return max_residual
+end
