@@ -18,7 +18,6 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const balanced_branching = [2, 1, 6]
 const nN   = 9
 const nD   = 3
 
@@ -54,24 +53,18 @@ topo_arr = linknode[]
 
 nTestTopo = 1
 
-function balanced_topo_gen!(node::linknode, branching_by_level::Vector{Int}; level::Int = 1)
+function balanced_topo_gen!(node::linknode)
     global countID
 
-    if level > length(branching_by_level)
-        return
-    end
+    nN == 9 || error("This balanced topology is defined for nN = 9")
+    nD == 3 || error("This balanced topology is defined for nD = 3")
 
-    num_children = branching_by_level[level]
-    num_children >= 0 || error("Balanced tree branching values must be nonnegative")
-    if num_children == 0
-        return
-    end
+    branch_nodes = [linknode(string(countID += 1)) for _ in 1:2]
+    set_relative!(node, branch_nodes)
 
-    children = [linknode(string(countID += 1)) for _ in 1:num_children]
-    set_relative!(node, children)
-
-    for child in children
-        balanced_topo_gen!(child, branching_by_level; level = level + 1)
+    for branch in branch_nodes
+        leaves = [linknode(string(countID += 1)) for _ in 1:3]
+        set_relative!(branch, leaves)
     end
 end
 
@@ -107,7 +100,7 @@ for tp in 1:nTestTopo
 
     root = linknode(string(countID+=1))
 
-    balanced_topo_gen!(root, balanced_branching)
+    balanced_topo_gen!(root)
     display(save_topology_shape(root, "Balanced"))
 
     #Only for disjoint problem
