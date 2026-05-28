@@ -11,7 +11,7 @@ using Random
 using Statistics
 
 const nD = 5
-const nN = 20
+const nN = 30
 const N_TOPOLOGIES_TO_PLOT = 1
 const RNG_SEED = 2026
 
@@ -19,7 +19,7 @@ const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
 const FIG_DIR = joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem")
 const TRAJECTORY_FILE = joinpath(DATA_DIR, "trajectories-D=$(nD)-N=$(nN).csv")
 const DEFAULT_SELECTED_LAMBDAS = Dict(
-    "hADMM" => 3.2e-04,
+    "hADMM" => 1.6e-04,
     "fADMM" => 3.2e-04,
 )
 
@@ -342,7 +342,7 @@ function plot_metric_by_topology(df::DataFrame, topologies, metric_col::Symbol, 
         yscale = yscale,
         grid = true,
         size = (800, 600),
-        legend = :topleft,
+        legend = :topright,
     )
 
     for topo in topologies
@@ -396,7 +396,7 @@ function plot_gap_vs_communication(df::DataFrame, topologies, output_name::Strin
         yscale = :log10,
         grid = true,
         size = (800, 600),
-        legend = :topleft,
+        legend = :topright,
     )
 
     for topo in topologies

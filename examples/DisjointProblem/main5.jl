@@ -18,7 +18,7 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 30
+const nN   = 35
 const nD   = 7
 
 const local_l = -2.0
@@ -27,11 +27,11 @@ const local_u = 2.0
 const λn   = 1e-3
 # const λf   = 1e-3
 const λh = let values = Float64[], current_λ = 1e-5
-    while current_λ < 1e-3
+    while current_λ < 1e-4
         push!(values, current_λ)
         current_λ *= 2
     end
-    push!(values, 1e-3)
+    push!(values, 1e-4)
     values
 end
 const λf_values = copy(λh)
@@ -52,7 +52,7 @@ final_obj  = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64
 topo_arr = linknode[]
 
 
-nTestTopo = 10
+nTestTopo = 3
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
