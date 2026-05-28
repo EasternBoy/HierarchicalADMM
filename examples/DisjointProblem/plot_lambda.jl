@@ -8,14 +8,14 @@ using Plots
 using Printf
 using Random
 
-const nD = 3
-const nN = 9
+const nD = 5
+const nN = 20
 const N_TOPOLOGIES_TO_PLOT = 1
 const RNG_SEED = 2026
 
 const DATA_DIR = joinpath(@__DIR__, "..", "..", "data", "disjoint-problem")
 const FIG_DIR = joinpath(@__DIR__, "..", "..", "media", "figs", "disjoint_problem")
-const TRAJECTORY_FILE = joinpath(DATA_DIR, "balance_tree-D=$(nD)-N=$(nN).csv")
+const TRAJECTORY_FILE = joinpath(DATA_DIR, "trajectories-D=$(nD)-N=$(nN).csv")
 
 const TARGET_ALGS = ["hADMM", "fADMM"]
 const LAMBDA_COLORS = [

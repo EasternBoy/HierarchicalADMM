@@ -18,8 +18,8 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 30
-const nD   = 7
+const nN   = 40
+const nD   = 9
 
 const local_l = -2.0
 const local_u = 2.0
@@ -27,11 +27,11 @@ const local_u = 2.0
 const λn   = 1e-3
 # const λf   = 1e-3
 const λh = let values = Float64[], current_λ = 1e-5
-    while current_λ < 1e-3
+    while current_λ < 1e-4
         push!(values, current_λ)
         current_λ *= 2
     end
-    push!(values, 1e-3)
+    push!(values, 1e-4)
     values
 end
 const λf_values = copy(λh)

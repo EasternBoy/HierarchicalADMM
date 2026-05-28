@@ -26,23 +26,16 @@ const local_u = 2.0
 
 const λn   = 1e-3
 
-const λf = let values = Float64[], current_λ = 1e-5
-    while current_λ < 1e-3
+const λf = let values = Float64[], current_λ = 1e-4
+    while current_λ < 1e-2
         push!(values, current_λ)
         current_λ *= 2
     end
-    push!(values, 1e-4)
+    push!(values, 1e-2)
     values
 end
 
-const λh = let values = Float64[], current_λ = 1e-5
-    while current_λ < 1e-3
-        push!(values, current_λ)
-        current_λ *= 2
-    end
-    push!(values, 1e-4)
-    values
-end
+const λh = copy(λf)
 const tol  = 1e-4
 const max_iter = 1000
 
@@ -51,7 +44,7 @@ global countID
 topo_arr = linknode[]
 
 
-nTestTopo = 1
+nTestTopo = 10
 
 function balanced_topo_gen!(node::linknode)
     global countID
