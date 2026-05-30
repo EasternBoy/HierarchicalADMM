@@ -18,8 +18,8 @@ include("HADMM_ProximalSolver.jl")
 include("NestedADMM.jl")
 include("FlattenADMM.jl")
 
-const nN   = 30
-const nD   = 5
+const nN   = 40
+const nD   = 7
 
 const local_l = -2.0
 const local_u = 2.0
@@ -52,7 +52,7 @@ final_obj  = Dict("nADMM" => Float64[], "fADMM" => Float64[], "hADMM" => Float64
 topo_arr = linknode[]
 
 
-nTestTopo = 1
+nTestTopo = 3
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
