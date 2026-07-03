@@ -1,19 +1,17 @@
 function collect_nodes!(node::linknode, flatten_nodes)
+    if node.parent !== nothing
+        push!(flatten_nodes, node.ID => node)
+    end
+
     if node.children !== nothing
         for child in node.children
-            push!(flatten_nodes, child.ID => child)
             collect_nodes!(child, flatten_nodes)
         end
-    elseif node.parent !== nothing
-        # Leaf node
-        push!(flatten_nodes, node.ID => node)
-    else
-        # Do not add root node
     end
 end
 
 
-function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict, dict_dual::Dict, pos::Dict, nV::Dict; λ = λₙ)
+function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_child::Dict, dict_dual::Dict, pos::Dict, nV::Dict; λ = λₛ)
     para = root.cost_func.para
     func = root.cost_func.val
 
@@ -28,7 +26,7 @@ function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_chi
     end
 
     f = ProximalAlgorithms.AutoDifferentiable(
-        v -> func(v; para = para) + sum((1/(2λ))*dot(v[index[key]] - query[key], v[index[key]] - query[key]) for (key, value) in query),
+        v -> func(v; para = para) + (1/(2λ))*sum(dot(v[index[key]] - query[key], v[index[key]] - query[key]) for (key, value) in query),
         AutoZygote()
     )
 
@@ -36,15 +34,15 @@ function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_chi
 
     x0 = ones(root.nV)
 
-    solution, iterations = root.solver(f = f, g = g, x0 = x0)
+    solution, _ = root.solver(f = f, g = g, x0 = x0)
 
-    for (key, value) in dict_prime_root
+    for (key, _) in dict_prime_root
         dict_prime_root[key] = solution[index[key]]
     end
 end
 
 
-function update_leaf_flat(node::linknode, query::Vector{Float64}, λ = λₙ)
+function update_leaf_flat(node::linknode, query::Vector{Float64}, λ = λₛ)
     para = node.cost_func.para
     func = node.cost_func.val
 
@@ -108,7 +106,7 @@ end
 
 
 
-function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
+function flattenADMM(root::linknode; tol = tol, λ = λₛ, max_iter = max_iter)
 
     # Flatten the tree structure into a list of nodes
     dict_prime_child = Dict()
@@ -132,15 +130,15 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
         nV[key]               = value.nV
     end
 
-    # println("nV = $nV")
-    # println("pos = $pos")
+
+    dict_child_root_old = deepcopy(dict_prime_child)
 
     # Initialize the query vector
     for iteration in 1:max_iter
 
         root.iteration += 1 #Add 1 iteration in root
 
-        update_root_flat!(root, dict_prime_root, dict_prime_child, dict_dual, pos, nV)
+        update_root_flat!(root, dict_prime_root, dict_prime_child, dict_dual, pos, nV; λ = λ)
 
         ter = Float64[]
         # Iterate through the nodes to solve the optimization problem
@@ -150,14 +148,23 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
             query = dict_prime_root[key] + dict_dual[key]
 
             com_cost!(path[key], query, 1) #Communication from root to child
-            dict_prime_child[key] = update_leaf_flat(value, query)
+            dict_prime_child[key] = update_leaf_flat(value, query, λ)
 
-            res = dict_prime_root[key] - dict_prime_child[key]
-            dict_dual[key] += res
+            prime_res = dict_prime_root[key]   - dict_prime_child[key]
+            dual_res  = (dict_prime_child[key] - dict_child_root_old[key])/λ
+            dict_dual[key] += prime_res
 
-            push!(ter, maximum(abs.(res)))
+            # Check stopping criteria based on the residuals
+            if prime_stop
+                push!(ter, norm(prime_res, Inf))
+            else
+                push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
+            end
+
             com_cost!(reverse(path[key]), dict_prime_child[key], 1) #Communication from child to root to compute dual variable located in root
         end
+
+        dict_child_root_old = copy(dict_prime_child)
 
         if maximum(ter) < tol
             println("fADMM converged after $iteration iterations in root")
@@ -165,5 +172,19 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
         end
     end
 
+    assign_node!(root, dict_prime_child)
+
     return dict_prime_root
+end
+
+
+function assign_node!(node, dict_prime)
+    if node.children !==  nothing
+        for child in node.children
+            node.prime[child.ID] = copy(dict_prime[child.ID])
+            assign_node!(child, dict_prime)
+        end
+    else
+        node.prime[node.ID] = copy(dict_prime[node.ID])
+    end
 end

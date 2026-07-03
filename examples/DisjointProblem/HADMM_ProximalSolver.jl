@@ -85,17 +85,25 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
 
     if node.children !== nothing
         for child in node.children
+            
+            child_prime_old  = vect_prime(child)
             hierarchicalADMM!(child, ter)
+
             #Update dual
             child_prime = vect_prime(child)
-            res = node.prime[child.ID] - child_prime
-            node.dual[child.ID] += res
+            prime_res = node.prime[child.ID] - child_prime
+            dual_res  = (child_prime  -  child_prime_old)/λₕ
+            node.dual[child.ID] += prime_res
 
             # Child sent its prime var to node
             com_cost!(child, child_prime, 1)
 
             #Take the maximum residual error for stopping criteria
-            push!(ter, maximum(abs.(res)))
+            if prime_stop
+                push!(ter, norm(prime_res, Inf))
+            else
+                push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
+            end
         end
     end
 end
