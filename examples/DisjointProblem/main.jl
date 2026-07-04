@@ -17,7 +17,7 @@ include("hADMM.jl")
 include("nADMM.jl")
 include("fADMM.jl")
 
-const mode = 3  # 1: optimality gap, 2: run in specific iterations, 3: stopping criteria
+const mode = 2  # 1: optimality gap, 2: run in specific iterations, 3: stopping criteria
 const nN   = 20 
 const nD   = 5
 
@@ -33,14 +33,17 @@ max_com    = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 topo_arr = linknode[]
 
 
-nTestTopo = 1000
+nTestTopo = 10
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
-figRes = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
-figJ   = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
+figRes   = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
+figJ     = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
 
 
+
+avg_gap_hADMM = zeros(Niter)
+avg_gap_fADMM = zeros(Niter) 
 
 for tp in 1:nTestTopo
     println("Solving topology $tp")
@@ -59,9 +62,11 @@ for tp in 1:nTestTopo
     ## Hierarchical ADMM
     reset!(root)
     traj_err, traj_res, traj_opt_hADMM = hADMM(root, dict_result)
-    J_opt_hADMM   = total_cost(root)
+    J_opt_hADMM     = total_cost(root)
     push!(topo_arr, deepcopy(root))
-    total, max_num = tt_com_iter(root)
+    total, max_num  = tt_com_iter(root)
+    avg_gap_hADMM .+= abs.(traj_opt_hADMM .- opt_value)/maximum(abs.(traj_opt_hADMM .- opt_value))/nTestTopo
+    avg_gap_hADMM  .= monotone_func(avg_gap_hADMM)
 
     push!(node_iter["hADMM"], max_num["iter"])
     push!(max_com["hADMM"],   max_num["com"])
@@ -69,7 +74,8 @@ for tp in 1:nTestTopo
 
     plot!(figPrime, 1:length(traj_err), traj_err, yscale = :log10, grid = true, label = "")
     plot!(figRes, 1:length(traj_res), traj_res, yscale = :log10, grid = true, label = "")
-    plot!(figJ, 1:length(traj_opt_hADMM), abs.(traj_opt_hADMM .- opt_value)/maximum(abs.(traj_opt_hADMM .- opt_value)), yscale = :log10, grid = true, label = "")
+    plot!(figJ, 1:length(traj_opt_hADMM), abs.(traj_opt_hADMM .- opt_value)/maximum(abs.(traj_opt_hADMM[1] .- opt_value)), yscale = :log10, grid = true, label = "")
+
 
     ## Nested ADMM
     reset!(root)  #Reset variables
@@ -83,6 +89,8 @@ for tp in 1:nTestTopo
     ## Flatten ADMM
     reset!(root)  #Reset variables
     traj_opt_fADMM = flattenADMM(root)
+    avg_gap_fADMM .+= abs.(traj_opt_fADMM .- opt_value)/maximum(abs.(traj_opt_fADMM[1] .- opt_value))/nTestTopo
+    avg_gap_fADMM  .= monotone_func(avg_gap_fADMM)
 
     total, max_num = tt_com_iter(root)
     push!(node_iter["fADMM"], max_num["iter"])
@@ -92,6 +100,7 @@ for tp in 1:nTestTopo
     # println("Diff h-n ADMM optimal cost:", J_opt_hADMM - J_opt_nADMM)
     # println("Diff h-true:", J_opt_hADMM - opt_value)
 end
+
 
 savefig(figPrime, joinpath("media","figs","disjoint_problem",string("DJ-Prime-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
 savefig(figRes, joinpath("media","figs","disjoint_problem",string("DJ-Res-Conver-D=",string(nD),"-N=",string(nN),".pdf")))
@@ -112,11 +121,20 @@ for (key, value) in max_com
     println("$key Maximum number of scalar variables sent by a node (min) avg. (max): ($min_value) $med ($max_value)")
 end
 println()
+figComCost = plot(framestyle = :box, guidefont = fontsize, legendfontsize = fontsize, tickfontsize = fontsize, xlabel = "TotalVals", ylabel = "Optimality Gap", yscale = :log10, xscale = :log10, ylims = [1e-7, 2])
 for (key, value) in tt_com
     med = round(median(value))
     min_value, min_index = findmin(value)
     max_value, max_index = findmax(value)
     println("$key Total number of scalar variables sent in network (min) avg. (max): ($min_value) $med ($max_value)")
+    if key == "hADMM" && mode == 2
+        plot!(figComCost, (1:Niter)*mean(value)/Niter, avg_gap_hADMM, label = "hADMM", linewidth = 4)
+        savefig(figComCost, joinpath("media","figs","disjoint_problem",string("Cost-Com-ADMM-D=",string(nD),"-N=",string(nN),".pdf")))
+    end
+    if key == "fADMM" && mode == 2
+        plot!(figComCost, (1:Niter)*mean(value)/Niter, avg_gap_fADMM, label = "fADMM", linewidth = 4)
+        savefig(figComCost, joinpath("media","figs","disjoint_problem",string("Cost-Com-ADMM-D=",string(nD),"-N=",string(nN),".pdf")))
+    end
 end
 
 npzwrite(joinpath("data","disjoint-problem",string("Max-iter-D=",nD,"-N=",nN,"-h=",Int(round(medstep["hADMM"])),"-f=",Int(round(medstep["fADMM"])),".npz")), node_iter)
