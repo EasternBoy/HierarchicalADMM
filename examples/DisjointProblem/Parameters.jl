@@ -7,7 +7,7 @@ elseif nD == 3 && nN == 20
     const λₛ = 2e-3
     const λₕ = 2e-3
 elseif nD == 5 && nN == 20 
-    const λₙ = 2e-3
+    const λₙ = 1e-3
     const λₛ = 2e-3
     const λₕ = 1.5e-3
 end

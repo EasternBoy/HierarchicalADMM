@@ -15,7 +15,7 @@ end
 
 max_iter1, max_com1, tt_com1 = network_data(3,10,30,24)
 max_iter2, max_com2, tt_com2 = network_data(3,20,33,30)
-max_iter3, max_com3, tt_com3 = network_data(5,20,31,21)
+max_iter3, max_com3, tt_com3 = network_data(5,20,49,38)
 
 
 color = Dict("hADMM"=> :blue, "fADMM"=> :green)
@@ -36,7 +36,7 @@ annotate!((0, ylims(plt1)[2], text("x100", :left, tickfont)))
 savefig(plt1,joinpath("media","figs","disjoint_problem","Tot-com-3-10.pdf"))
 
 
-plt2 = plot(size = (400,600), tickfont = tickfont, yticks = [10, 12, 14, 16, 18, 20])
+plt2 = plot(size = (400,600), tickfont = tickfont)
 for (key, value) in tt_com2
     if key !== "nADMM"
         x = fill(key, length(value))
