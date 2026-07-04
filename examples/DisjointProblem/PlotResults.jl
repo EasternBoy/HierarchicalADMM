@@ -13,8 +13,8 @@ function network_data(D, N, h, f)
 end
 
 
-max_iter1, max_com1, tt_com1 = network_data(3,10,19,17)
-max_iter2, max_com2, tt_com2 = network_data(3,20,21,17)
+max_iter1, max_com1, tt_com1 = network_data(3,10,30,24)
+max_iter2, max_com2, tt_com2 = network_data(3,20,33,30)
 max_iter3, max_com3, tt_com3 = network_data(5,20,31,21)
 
 
@@ -22,7 +22,7 @@ color = Dict("hADMM"=> :blue, "fADMM"=> :green)
 
 tickfont = 16
 width = 2
-viol = true
+viol = false
 plt1 = plot(size = (400,600), tickfont = tickfont)
 for (key, value) in tt_com1
     if key !== "nADMM"

@@ -99,11 +99,7 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
             com_cost!(child, child_prime, 1)
 
             #Take the maximum residual error for stopping criteria
-            if prime_stop
-                push!(ter, norm(prime_res, Inf))
-            else
-                push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
-            end
+            push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
         end
     end
 end
@@ -114,11 +110,12 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
     
     traj_err = Float64[]
     traj_res = Float64[]
-    opt_value = Float64[]
+    opt_value_hADMM = Float64[]
     
     for iteration in 1:max_iter
         ter = Float64[]
-        push!(opt_value, total_cost(root))
+        current_cost = total_cost(root)
+        push!(opt_value_hADMM, current_cost)
         hierarchicalADMM!(root, ter)
 
         err = Float64[]
@@ -126,57 +123,23 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
         push!(traj_res, maximum(ter))
         push!(traj_err, sum(err))
 
-        if maximum(ter) < tol
-            println("hADMM converged after $iteration iterations in root")
-            return traj_err, traj_res, opt_value
+        if mode == 1
+            if abs((opt_value - current_cost)/opt_value) < opt_gap
+                println("hADMM converged after $iteration iterations in root")
+                return traj_err, traj_res, opt_value_hADMM
+            end
+        elseif mode == 2
+            if iteration >= Niter
+                println("hADMM stoped after $iteration iterations in root")
+                return traj_err, traj_res, opt_value_hADMM
+            end
+        else
+            if maximum(ter) < tol
+                println("hADMM converged after $iteration iterations in root")
+                return traj_err, traj_res, opt_value_hADMM
+            end
         end
     end
 
-    return traj_err, traj_res, opt_value
+    return traj_err, traj_res, opt_value_hADMM
 end
-
-# function forward_hierarchicalADMM!(root::linknode; max_nlayer = 10)
-#     #Update prime 
-#     VecLink = [root]
-
-#     for _ in 1:max_nlayer #maximum layer is 10
-#         if !isempty(VecLink)
-#             newVecLink = linknode[]
-#             for node in VecLink
-#                 prox!(node)
-#                 if node.children !== nothing
-#                     for child in node.children
-#                         push!(newVecLink, child)
-#                     end
-#                 end
-#             end
-#             VecLink = newVecLink
-#         end
-#     end
-# end
-
-
-# function backward_hierarchicalADMM!(root::linknode, ter::Vector{Float64};  max_nlayer = 10)
-#     VecLink = [root]
-
-#     for _ in 1:max_nlayer #maximum layer is 10
-#         if !isempty(VecLink)
-#             newVecLink = linknode[]
-#             max_abs = 0
-#             for node in VecLink
-#                 if node.children !== nothing
-#                     for child in node.children
-#                         res = node.prime[child.ID] - vect_prime(child)
-#                         node.dual[child.ID] = node.dual[child.ID] + res
-#                         max_abs = (max_abs > maximum(abs.(res))) ? max_abs : maximum(abs.(res))
-#                         push!(ter, max_abs)
-#                         if child.children !== nothing
-#                             push!(newVecLink, child)
-#                         end
-#                     end
-#                 end
-#             end
-#             VecLink = newVecLink
-#         end
-#     end
-# end

@@ -112,6 +112,7 @@ function flattenADMM(root::linknode; tol = tol, λ = λₛ, max_iter = max_iter)
     dict_prime_child = Dict()
     dict_prime_root  = Dict()
     dict_dual        = Dict()
+    opt_value_fADMM  = Float64[]
     
     flatten_tree = Dict()
     collect_nodes!(root, flatten_tree)
@@ -155,24 +156,34 @@ function flattenADMM(root::linknode; tol = tol, λ = λₛ, max_iter = max_iter)
             dict_dual[key] += prime_res
 
             # Check stopping criteria based on the residuals
-            if prime_stop
-                push!(ter, norm(prime_res, Inf))
-            else
-                push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
-            end
+            push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
 
             com_cost!(reverse(path[key]), dict_prime_child[key], 1) #Communication from child to root to compute dual variable located in root
         end
 
         dict_child_root_old = copy(dict_prime_child)
+        assign_node!(root, dict_prime_child)
+        current_cost = total_cost(root)
+        push!(opt_value_fADMM, current_cost)
 
-        if maximum(ter) < tol
-            println("fADMM converged after $iteration iterations in root")
-            break
+        if mode == 1
+            if abs((opt_value - current_cost)/opt_value) < opt_gap
+                println("hADMM converged after $iteration iterations in root")
+                return opt_value_fADMM
+            end
+        elseif mode == 2
+            if iteration >= Niter
+                println("hADMM stoped after $iteration iterations in root")
+                return opt_value_fADMM
+            end
+        else
+            if maximum(ter) < tol
+                println("fADMM converged after $iteration iterations in root")
+                return opt_value_fADMM
+            end
         end
+        
     end
-
-    assign_node!(root, dict_prime_child)
 
     return dict_prime_root
 end
