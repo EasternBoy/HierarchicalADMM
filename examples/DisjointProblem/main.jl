@@ -17,9 +17,9 @@ include("hADMM.jl")
 include("nADMM.jl")
 include("fADMM.jl")
 
-const mode = 2  # 1: optimality gap, 2: run in specific iterations, 3: stopping criteria
-const nN   = 20 
-const nD   = 5
+const mode = 3  # 1: optimality gap, 2: run in specific iterations, 3: stopping criteria
+const nN   = 10 
+const nD   = 3
 
 include("Parameters.jl")
 
@@ -33,7 +33,7 @@ max_com    = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 topo_arr = linknode[]
 
 
-nTestTopo = 10
+nTestTopo = 100
 
 fontsize = 16
 figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
@@ -65,8 +65,10 @@ for tp in 1:nTestTopo
     J_opt_hADMM     = total_cost(root)
     push!(topo_arr, deepcopy(root))
     total, max_num  = tt_com_iter(root)
-    avg_gap_hADMM .+= abs.(traj_opt_hADMM .- opt_value)/maximum(abs.(traj_opt_hADMM .- opt_value))/nTestTopo
-    avg_gap_hADMM  .= monotone_func(avg_gap_hADMM)
+    if mode == 2
+        avg_gap_hADMM .+= abs.(traj_opt_hADMM .- opt_value)/maximum(abs.(traj_opt_hADMM .- opt_value))/nTestTopo
+        avg_gap_hADMM  .= monotone_func(avg_gap_hADMM)
+    end
 
     push!(node_iter["hADMM"], max_num["iter"])
     push!(max_com["hADMM"],   max_num["com"])
@@ -89,8 +91,10 @@ for tp in 1:nTestTopo
     ## Flatten ADMM
     reset!(root)  #Reset variables
     traj_opt_fADMM = flattenADMM(root)
-    avg_gap_fADMM .+= abs.(traj_opt_fADMM .- opt_value)/maximum(abs.(traj_opt_fADMM[1] .- opt_value))/nTestTopo
-    avg_gap_fADMM  .= monotone_func(avg_gap_fADMM)
+    if mode == 2
+        avg_gap_fADMM .+= abs.(traj_opt_fADMM .- opt_value)/maximum(abs.(traj_opt_fADMM[1] .- opt_value))/nTestTopo
+        avg_gap_fADMM  .= monotone_func(avg_gap_fADMM)
+    end
 
     total, max_num = tt_com_iter(root)
     push!(node_iter["fADMM"], max_num["iter"])
