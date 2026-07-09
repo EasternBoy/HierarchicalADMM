@@ -1,13 +1,13 @@
 include("TreeGeneration.jl")
 
-function prox!(node::linknode; λ = 0.25)  
+function prox!(node::linknode; λ = 0.2)  
 
     opti = JuMP.Model(Ipopt.Optimizer)
     set_silent(opti)
 
     x0 = ones(node.nV)
     @variable(opti, x[i = 1:node.nV], base_name = string("x",node.ID), start = x0[i])
-    @constraint(opti, x .>= 0)
+    @constraint(opti, x .>= 1e-5)
 
     func = node.cost_func.val
     para = node.cost_func.para
@@ -20,7 +20,10 @@ function prox!(node::linknode; λ = 0.25)
         
         com_cost!(node.parent,q, 1)
 
-        J += func(x; para = para) + 1/(2λ)*(x - q)'*(x - q)
+        @variable(opti, sl[i=1:node.nV] .>= 0, base_name = string("sl", node.ID))
+        J += sum(sl) + 1/(2λ)*(x - q)'*(x - q)
+        @constraint(opti, sl .>= 1 ./x .- 1/para[1])
+
     elseif node.parent === nothing #Root node
         nc = length(node.children)
         
@@ -49,8 +52,7 @@ function prox!(node::linknode; λ = 0.25)
         τ  = para[2]
         nc = para[3]
         horizon = Int64(node.nV/nc)
-        t = @variable(opti, [i=1:horizon], base_name = string("t",node.ID))
-        @constraint(opti, t .>= 0)
+        @variable(opti, t[i=1:horizon] .>= 0, base_name = string("t",node.ID))
         for i in 1:horizon
             @constraint(opti, t[i] >= sum([x[(j-1)*horizon + i] for j in 1:nc]) - τ)
         end
@@ -63,6 +65,7 @@ function prox!(node::linknode; λ = 0.25)
 
     #Update prime variable
     if node.children === nothing #leaf node has only one
+        # sl_opt = JuMP.value.(sl)
         node.prime[node.ID] = x
     else
         index = 1
@@ -75,71 +78,54 @@ function prox!(node::linknode; λ = 0.25)
     end
 end
 
-# function forward_hierarchicalADMM!(root::linknode; max_nlayer = 10)
-#     #Update prime 
-#     VecLink = [root]
 
-#     for _ in 1:max_nlayer #maximum layer is 10
-#         if !isempty(VecLink)
-#             newVecLink = linknode[]
-#             for node in VecLink
-#                 prox!(node)
-#                 if node.children !== nothing
-#                     for child in node.children
-#                         push!(newVecLink, child)
-#                     end
-#                 end
-#             end
-#             VecLink = newVecLink
-#         end
-#     end
-# end
-
-
-# function backward_hierarchicalADMM!(root::linknode, ter::Vector{Float64};  max_nlayer = 10)
-#     VecLink = [root]
-
-#     for _ in 1:max_nlayer #maximum layer is 10
-#         if !isempty(VecLink)
-#             newVecLink = linknode[]
-#             max_abs = 0
-#             for node in VecLink
-#                 if node.children !== nothing
-#                     for child in node.children
-#                         res = node.prime[child.ID] - vect_prime(child)
-#                         node.dual[child.ID] = node.dual[child.ID] + res
-#                         max_abs = (max_abs > maximum(abs.(res))) ? max_abs : maximum(abs.(res))
-#                         push!(ter, max_abs)
-#                         if child.children !== nothing
-#                             push!(newVecLink, child)
-#                         end
-#                     end
-#                 end
-#             end
-#             VecLink = newVecLink
-#         end
-#     end
-# end
-
-
-function HADMM_JuMP!(node::linknode, ter::Vector{Float64})
+function hADMM_JuMP!(node::linknode, ter::Vector{Float64}; λ = 0.2)
+    node.iteration += 1
     #Update prime
-    prox!(node)
+    prox!(node; λ = λ)
 
     if node.children !== nothing
         for child in node.children
-            HADMM_JuMP!(child, ter)
+            child_prime_old = vect_prime(child)
+            hADMM_JuMP!(child, ter; λ = λ)
 
             #Update dual
             prime_child = vect_prime(child)
-            res = child.parent.prime[child.ID] -  prime_child
-            child.parent.dual[child.ID] += res
+            prime_res = node.prime[child.ID] - prime_child
+            dual_res  = (prime_child - child_prime_old)/λ
+            node.dual[child.ID] += prime_res
 
             # Receive a prime variable of one child for updating dual variable
             com_cost!(child, prime_child, 1)
 
             #Take the maximum residual error for stopping criteria
-            push!(ter, maximum(abs.(res)))
+            push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
         end
     end
+end
+
+function hADMM_JuMP(root::linknode; max_iter = 200, λ = 0.2)
+
+    J_hADMM  = Float64[]
+    traj_res = Float64[]
+
+    push!(J_hADMM, total_cost(vect_prime(root), root))
+
+    for step in 1:max_iter
+        ter = Float64[]
+
+        hADMM_JuMP!(root, ter; λ = λ)
+
+        push!(J_hADMM, total_cost(vect_prime(root), root))
+
+        if maximum(ter) < tol
+            println("Terminates at step $step")
+            return traj_res, J_hADMM
+        end
+
+        push!(traj_res, maximum(ter))
+        if step % 10 == 0 println("Step $step: Primal-Dual stopping criteria = ", maximum(ter)) end
+    end
+
+    return traj_res, J_hADMM
 end

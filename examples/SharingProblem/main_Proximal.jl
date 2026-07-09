@@ -29,7 +29,7 @@ a = Dict("5"=> 2., "6"=> 5., "7"=> 3., "8"=> 2., "9"=> 3., "10"=> 5.)
 global para = parameter(τ, a, β, ϵ, η)
 const λₙ    = 0.18
 const λₕ    = 0.18
-const tol   = 1e-4
+const tol   = 1e-2
 const max_iter = 1000
 
 root = linknode("1")

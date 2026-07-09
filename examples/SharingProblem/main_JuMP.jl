@@ -1,5 +1,5 @@
 import Pkg
-using Pkg, Plots, LinearAlgebra, Graphs, GraphRecipes, Ipopt, JuMP, ProximalAlgorithms
+using Pkg, Plots, LinearAlgebra, Graphs, GraphRecipes, Ipopt, JuMP, ProximalAlgorithms, MadNLP
 
 
 Pkg.activate(".")
@@ -7,6 +7,8 @@ Pkg.instantiate()
 
 include("hADMM_JuMP.jl")
 include("getGlobalJuMP.jl")
+include("NestedADMM_JuMP.jl")
+include("fADMM_juMP.jl")
 
 
 global step_arr = Int64[]
@@ -32,8 +34,11 @@ a = Dict("5"=> 2., "6"=> 5., "7"=> 3., "8"=> 2., "9"=> 3., "10"=> 5.)
 
 global para = parameter(τ, a, β, ϵ, η)
 
-tol      = 1e-4
-max_iter = 100
+const λₙ       = 1.
+const λₕ       = 1.4
+const λₛ       = 1.5
+const tol      = 1e-3
+const max_iter = 200
 
 root = linknode("1")
 
@@ -43,32 +48,32 @@ setup_network!(root, para)
 
 dict_result, opt_cen = get_GlobalVarsJuMP(root)
 
-traj_err = Float64[]
-traj_res = Float64[]
-
 fig1 = plot(framestyle = :box)
 fig2 = plot(framestyle = :box)
 
-for step in 1:max_iter
-    ter = Float64[]
+traj_res, traj_J = hADMM_JuMP(root; max_iter = max_iter, λ = λₕ)
+hADMM_total, hADMM_max_num = tt_com_iter(root)
 
-    Jdiff = total_cost(vect_prime(root), root) - opt_cen
-    push!(traj_err, Jdiff)
-    println("Step $step distant to optimal value $Jdiff")
+reset!(root)
+nestedADMM!(root; tol = tol, max_iter = max_iter, λ = λₙ)
+nADMM_total, nADMM_max_num = tt_com_iter(root)
+println("J_nADMM = ", total_cost(vect_prime(root), root))
 
-    HADMM_JuMP!(root, ter)
-    # HADMM_Prox!(root, ter)
+reset!(root)
+traj_J_fADMM, traj_res_fADMM = flattenADMM(root; tol = tol, max_iter = max_iter, λ = λₛ)
+fADMM_total, fADMM_max_num = tt_com_iter(root)
+println("J_fADMM = ", total_cost(vect_prime(root), root))
 
-    if maximum(ter) < tol
-        println("Terminates at step $step")
-        break
-    end
+println("nADMM total communication: $nADMM_total, maximum number of iteration: $nADMM_max_num")
+println("hADMM total communication: $hADMM_total, maximum number of iteration: $hADMM_max_num")
+println("fADMM total communication: $fADMM_total, maximum number of iteration: $fADMM_max_num")
 
-    push!(traj_res, maximum(ter))
-end
-
-plot!(fig1, 1:length(traj_err), traj_err, yscale = :log10, xlimit = [1, length(traj_err)], grid = true, label = "", linewidth=2)
-plot!(fig2, 1:length(traj_res), traj_res, yscale = :log10, xlimit = [1, length(traj_res)], grid = true, label = "", linewidth=2)
+plot!(fig1, 1:length(traj_J), abs.(traj_J .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10,
+                    xlimit = [1, length(traj_J)], grid = true, label = "hADMM", linewidth=2, yticks = [1e0, 1e-1, 1e-2, 1e-3], tickfont = 16)
+plot!(fig1, 1:length(traj_J_fADMM), abs.(traj_J_fADMM .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10,
+                    xlimit = [1, max(length(traj_J), length(traj_J_fADMM))], grid = true, label = "fADMM", linewidth=2, tickfont = 16)
+plot!(fig2, 1:length(traj_res), traj_res, yscale = :log10, xlimit = [1, max(length(traj_res), length(traj_res_fADMM))], grid = true, label = "hADMM", linewidth=2, tickfont = 16)
+plot!(fig2, 1:length(traj_res_fADMM), traj_res_fADMM, yscale = :log10, xlimit = [1, max(length(traj_res), length(traj_res_fADMM))], grid = true, label = "fADMM", linewidth=2, tickfont = 16)
 
 savefig(fig1, joinpath("media","figs","sharing_problem","SP-Cost-Conver.pdf"))
 savefig(fig2, joinpath("media","figs","sharing_problem","SP-Res-Conver.pdf"))

@@ -74,13 +74,15 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
 
             for child in node.children
                 qToChi  = node.prime[child.ID] + node.dual[child.ID]
+                child_prime_old = vect_prime(child)
             
                 nestedADMM!(child, qToChi)
 
                 child_prime = vect_prime(child)
-                res = node.prime[child.ID] - child_prime
-                node.dual[child.ID]  += res
-                ter = [ter; res]
+                primal_res = node.prime[child.ID] - child_prime
+                dual_res = (child_prime - child_prime_old)/λₙ
+                node.dual[child.ID] += primal_res
+                push!(ter, max(norm(primal_res, Inf), norm(dual_res, Inf)))
 
                 com_cost!(child, child_prime, 1) #Child sent its prime variable to node
             end
