@@ -4,7 +4,8 @@ function update_leaf!(node::linknode, query::Vector{Float64}; λ = λₙ)
 
     f = node.cost_func
 
-    g = ProximalOperators.NormL1(node.cost_func.w)
+    # g = ProximalOperators.NormL1(node.cost_func.w)
+    g = ProximalOperators.CubeNormL2(node.cost_func.w)
     
     x0 = ones(node.nV)
 
@@ -21,7 +22,9 @@ function update_parent!(node::linknode, top_query::Vector{Float64}, query::Vecto
 
     f = node.cost_func
 
-    g = ProximalOperators.NormL1(node.cost_func.w)
+    # g = ProximalOperators.NormL1(node.cost_func.w)
+    g = ProximalOperators.CubeNormL2(node.cost_func.w)
+
 
     x0 = ones(node.nV)
 
@@ -41,7 +44,9 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
 
     f = node.cost_func
 
-    g = ProximalOperators.NormL1(node.cost_func.w)
+    # g = ProximalOperators.NormL1(node.cost_func.w)
+    g = ProximalOperators.CubeNormL2(node.cost_func.w)
+
 
     x0 = ones(node.nV)
 
@@ -55,7 +60,7 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
 end
 
 
-function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter)
+function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter, λ = λₙ)
 
     node.iteration += 1
 
@@ -72,26 +77,28 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
             qToPar  = child_primes - vect_dual(node) #com
 
             if node.parent === nothing #Root
-                update_root!(node, qToPar)
+                update_root!(node, qToPar; λ = λ)
             else
-                update_parent!(node, top_query, qToPar)
+                update_parent!(node, top_query, qToPar; λ = λ)
                 com_cost!(node.parent, top_query, 1) # Parent sent top_query to node
             end
 
             for child in node.children
                 qToChi  = node.prime[child.ID] + node.dual[child.ID]
+                child_prime_old = copy(vect_prime(child))
             
-                nestedADMM!(child, qToChi)
+                nestedADMM!(child, qToChi; tol = tol, max_iter = max_iter, λ = λ)
 
                 child_prime = vect_prime(child)
-                res = node.prime[child.ID] - child_prime
-                node.dual[child.ID]  += res
-                append!(ter, res)
+                prime_res = node.prime[child.ID] - child_prime
+                dual_res = (child_prime - child_prime_old) / λ
+                node.dual[child.ID] += prime_res
+                push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
 
                 com_cost!(child, child_prime, 1) #Child sent its prime variable to node
             end
 
-            if maximum(abs.(ter)) < tol
+            if maximum(ter) < tol
                 if node.parent === nothing
                     println("nADMM converged after $iteration iterations in root")
                 end
@@ -101,6 +108,6 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
         end
     else
         com_cost!(node.parent, top_query, 1)
-        update_leaf!(node, top_query)
+        update_leaf!(node, top_query; λ = λ)
     end
 end

@@ -24,7 +24,7 @@ include("ConvergeRateConsensus.jl")
 const nN   = 8
 const nD   = 3
 
-const tol  = 1e-4
+const tol  = 1e-3
 const max_iter = 1000
 
 global countID
@@ -41,19 +41,19 @@ global countID = 0
 root = linknode(string(countID+=1))
 
 
-# network_config = [["1", "2"], ["1", "3"], ["1", "4"], ["1", "5"],
-#                               ["2", "6"], ["3", "7"], ["4", "8"]]
-# ρ  = 0.21
-# λₕ = 1/ρ
-# σ  = 0.22
-# rate_best = 0.1144                              
-
-network_config = [["1", "2"], ["2", "3"], ["2", "4"], ["2", "5"],
-                              ["2", "6"], ["2", "7"], ["2", "8"]]
-ρ  = 0.1
+network_config = [["1", "2"], ["1", "3"], ["1", "4"], ["1", "5"],
+                              ["2", "6"], ["3", "7"], ["4", "8"]]
+ρ  = 0.8
 const λₕ = 1/ρ
 σ  = 0.22
-rate_best = 0.0208                            
+rate_best = 0.1144                              
+
+# network_config = [["1", "2"], ["2", "3"], ["2", "4"], ["2", "5"],
+#                               ["2", "6"], ["2", "7"], ["2", "8"]]
+# ρ  = 100.
+# const λₕ = 1/ρ
+# σ  = 0.22
+# rate_best = 0.0208                            
 
 
 topo_gen!(root, network_config)

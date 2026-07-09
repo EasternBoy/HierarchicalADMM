@@ -32,9 +32,10 @@ function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_chi
         AutoZygote()
     )
 
-    g = ProximalOperators.NormL1(root.cost_func.w)
+    # g = ProximalOperators.NormL1(root.cost_func.w)
+    g = ProximalOperators.CubeNormL2(root.cost_func.w)
 
-    x0 = ones(root.nV)
+    x0 = ones(maximum(last(index[key]) for key in keys(index)))
 
     solution, iterations = root.solver(f = f, g = g, x0 = x0)
 
@@ -53,7 +54,8 @@ function update_leaf_flat(node::linknode, query::Vector{Float64}, λ = λₙ)
         AutoZygote()
     )
 
-    g = ProximalOperators.NormL1(node.cost_func.w)
+    # g = ProximalOperators.NormL1(node.cost_func.w)
+    g = ProximalOperators.CubeNormL2(node.cost_func.w)
 
     x0 = ones(node.nV)
     solution, iterations = node.solver(f = f, g = g, x0 = x0)
@@ -135,14 +137,16 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
     # println("nV = $nV")
     # println("pos = $pos")
 
+    dict_child_root_old = deepcopy(dict_prime_child)
+
     # Initialize the query vector
     for iteration in 1:max_iter
 
         root.iteration += 1 #Add 1 iteration in root
 
-        update_root_flat!(root, dict_prime_root, dict_prime_child, dict_dual, pos, nV)
+        update_root_flat!(root, dict_prime_root, dict_prime_child, dict_dual, pos, nV; λ = λ)
 
-        ter = Float64[]
+        max_residual = 0.0
         # Iterate through the nodes to solve the optimization problem
         for (key, value) in flatten_tree
             value.iteration += 1 #Add 1 iteration in a child
@@ -150,16 +154,19 @@ function flattenADMM(root::linknode; tol = tol, λ = λₙ, max_iter = max_iter)
             query = dict_prime_root[key] + dict_dual[key]
 
             com_cost!(path[key], query, 1) #Communication from root to child
-            dict_prime_child[key] = update_leaf_flat(value, query)
+            dict_prime_child[key] = update_leaf_flat(value, query, λ)
 
-            res = dict_prime_root[key] - dict_prime_child[key]
-            dict_dual[key] += res
+            prime_res = dict_prime_root[key] - dict_prime_child[key]
+            dual_res = (dict_prime_child[key] - dict_child_root_old[key]) / λ
+            dict_dual[key] += prime_res
 
-            push!(ter, maximum(abs.(res)))
+            max_residual = max(max_residual, norm(prime_res, Inf), norm(dual_res, Inf))
             com_cost!(reverse(path[key]), dict_prime_child[key], 1) #Communication from child to root to compute dual variable located in root
         end
 
-        if maximum(ter) < tol
+        dict_child_root_old = deepcopy(dict_prime_child)
+
+        if max_residual < tol
             println("fADMM converged after $iteration iterations in root")
             break
         end

@@ -16,7 +16,8 @@ function Proximal_Iteration(cost_func::CostFunc, q::Union{Float64, Vector{Float6
 
     f = cost_func
 
-    g = ProximalOperators.NormL1(cost_func.w)
+    # g = ProximalOperators.NormL1(cost_func.w)
+    g = ProximalOperators.CubeNormL2(cost_func.w)
     return f, g
 end
 
@@ -66,31 +67,33 @@ function proxAlg!(node::linknode; λ = λₕ)
 end
 
 
-function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
+function hierarchicalADMM!(node::linknode, ter::Vector{Float64}; λ = λₕ)
 
     node.iteration += 1
     
     #Update prime
-    proxAlg!(node)
+    proxAlg!(node; λ = λ)
 
     if node.children !== nothing
         for child in node.children
-            hierarchicalADMM!(child, ter)
+            child_prime_old = copy(child.prime)
+            hierarchicalADMM!(child, ter; λ = λ)
             #Update dual
-            res = node.prime - child.prime
-            node.dual[child.ID] += res
+            prime_res = node.prime - child.prime
+            dual_res = (child.prime - child_prime_old) / λ
+            node.dual[child.ID] += prime_res
 
             # Child sent its prime var to node
             com_cost!(child, child.prime, 1)
 
             #Take the maximum residual error for stopping criteria
-            push!(ter, maximum(abs.(res)))
+            push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
         end
     end
 end
 
 
-function hADMM(root::linknode, opt_sol; tol = tol, max_iter = max_iter)
+function hADMM(root::linknode, opt_sol; tol = tol, λ = λₕ, max_iter = max_iter)
     global stop_arr
     
     traj_err = Float64[]
@@ -100,7 +103,7 @@ function hADMM(root::linknode, opt_sol; tol = tol, max_iter = max_iter)
     for iteration in 1:max_iter
         ter = Float64[]
         push!(opt_value, total_cost(root))
-        hierarchicalADMM!(root, ter)
+        hierarchicalADMM!(root, ter; λ = λ)
 
         err = Float64[]
         get_err!(root, opt_sol, err)
@@ -123,7 +126,7 @@ function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Flo
     node.iteration += 1
     
     #Update prime
-    proxAlg!(node)
+    proxAlg!(node; λ = λₕ)
 
     y = vec_dual(node) - vec_dual(opt_node)
     x = node.prime     - opt_node.prime
@@ -132,16 +135,18 @@ function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Flo
 
     if node.children !== nothing
         for (child, child_opt) in zip(node.children, opt_node.children)
+            child_prime_old = copy(child.prime)
             hierarchicalADMM_V!(child, child_opt, ter, V; λₕ = λₕ)
             #Update dual
-            res = node.prime - child.prime
-            node.dual[child.ID] += res
+            prime_res = node.prime - child.prime
+            dual_res = (child.prime - child_prime_old) / λₕ
+            node.dual[child.ID] += prime_res
 
             # Child sent its prime var to node
             com_cost!(child, child.prime, 1)
 
             #Take the maximum residual error for stopping criteria
-            push!(ter, maximum(abs.(res)))
+            push!(ter, max(norm(prime_res, Inf), norm(dual_res, Inf)))
         end
     end
 end
@@ -165,7 +170,7 @@ function hADMM_V(root::linknode, opt_root::linknode; λ = 1., tol = tol, max_ite
     for iteration in 1:max_iter
         V   = [0.]
         ter = Float64[]
-        hierarchicalADMM_V!(root, opt_root, ter, V; λₕ = λₕ)
+        hierarchicalADMM_V!(root, opt_root, ter, V; λₕ = λ)
         println(V)
         push!(V_traj, V[1])
 

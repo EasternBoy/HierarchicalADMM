@@ -67,14 +67,14 @@ println("hADMM total communication: $hADMM_total, maximum number of iteration: $
 println("fADMM total communication: $fADMM_total, maximum number of iteration: $fADMM_max_num")
 
 
-fig1 = plot(framestyle = :box, yticks = [1e0, 1e-2, 1e-4, 1e-6], size = (600,350))
-fig2 = plot(framestyle = :box, yticks = [1e0, 1e-1, 1e-2, 1e-3], size = (600,350))
+fig1 = plot(framestyle = :box, yticks = [1e0, 1e-2, 1e-4, 1e-6], size = (600,350), tickfont = 16, legendfont = font(16))
+fig2 = plot(framestyle = :box, yticks = [1e0, 1e-1, 1e-2, 1e-3], size = (600,350), tickfont = 16, legendfont = font(16))
 
-plot!(fig1, 1:length(traj_J), abs.(traj_J .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10, xlimit = [1, length(traj_J)], grid = true, label = "hADMM", linewidth=2, tickfont = 16, framestyle = :box)
+plot!(fig1, 1:length(traj_J), abs.(traj_J .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10, xlimit = [1, length(traj_J)], grid = true, label = "hADMM", linewidth=4)
 
 # plot!(fig1, 1:length(traj_J_fADMM), abs.(traj_J_fADMM .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10, xlimit = [1, max(length(traj_J), length(traj_J_fADMM))], grid = true, label = "fADMM", linewidth=2, tickfont = 16)
 
-plot!(fig2, 1:length(traj_res), traj_res, yscale = :log10, xlimit = [1, max(length(traj_res), length(traj_res_fADMM))], grid = true, label = "hADMM", linewidth=2, tickfont = 16)
+plot!(fig2, 1:length(traj_res), traj_res, yscale = :log10, xlimit = [1, max(length(traj_res), length(traj_res_fADMM))], grid = true, label = "hADMM", linewidth=4)
 # plot!(fig2, 1:length(traj_res_fADMM), traj_res_fADMM, yscale = :log10, xlimit = [1, max(length(traj_res), length(traj_res_fADMM))], grid = true, label = "fADMM", linewidth=2, tickfont = 16)
 
 savefig(fig1, joinpath("media","figs","sharing_problem","SP-Cost-Conver.pdf"))
