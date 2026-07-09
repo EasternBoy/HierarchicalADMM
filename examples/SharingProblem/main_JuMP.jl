@@ -7,7 +7,7 @@ Pkg.instantiate()
 
 include("hADMM_JuMP.jl")
 include("getGlobalJuMP.jl")
-include("NestedADMM_JuMP.jl")
+include("nADMM_JuMP.jl")
 include("fADMM_juMP.jl")
 
 
@@ -48,8 +48,6 @@ setup_network!(root, para)
 
 dict_result, opt_cen = get_GlobalVarsJuMP(root)
 
-fig1 = plot(framestyle = :box)
-fig2 = plot(framestyle = :box)
 
 traj_res, traj_J = hADMM_JuMP(root; max_iter = max_iter, λ = λₕ)
 hADMM_total, hADMM_max_num = tt_com_iter(root)
@@ -68,12 +66,16 @@ println("nADMM total communication: $nADMM_total, maximum number of iteration: $
 println("hADMM total communication: $hADMM_total, maximum number of iteration: $hADMM_max_num")
 println("fADMM total communication: $fADMM_total, maximum number of iteration: $fADMM_max_num")
 
-plot!(fig1, 1:length(traj_J), abs.(traj_J .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10,
-                    xlimit = [1, length(traj_J)], grid = true, label = "hADMM", linewidth=2, yticks = [1e0, 1e-1, 1e-2, 1e-3], tickfont = 16)
-plot!(fig1, 1:length(traj_J_fADMM), abs.(traj_J_fADMM .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10,
-                    xlimit = [1, max(length(traj_J), length(traj_J_fADMM))], grid = true, label = "fADMM", linewidth=2, tickfont = 16)
+
+fig1 = plot(framestyle = :box, yticks = [1e0, 1e-2, 1e-4, 1e-6], size = (600,350))
+fig2 = plot(framestyle = :box, yticks = [1e0, 1e-1, 1e-2, 1e-3], size = (600,350))
+
+plot!(fig1, 1:length(traj_J), abs.(traj_J .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10, xlimit = [1, length(traj_J)], grid = true, label = "hADMM", linewidth=2, tickfont = 16, framestyle = :box)
+
+# plot!(fig1, 1:length(traj_J_fADMM), abs.(traj_J_fADMM .- opt_cen) ./ abs(traj_J[1] - opt_cen), yscale = :log10, xlimit = [1, max(length(traj_J), length(traj_J_fADMM))], grid = true, label = "fADMM", linewidth=2, tickfont = 16)
+
 plot!(fig2, 1:length(traj_res), traj_res, yscale = :log10, xlimit = [1, max(length(traj_res), length(traj_res_fADMM))], grid = true, label = "hADMM", linewidth=2, tickfont = 16)
-plot!(fig2, 1:length(traj_res_fADMM), traj_res_fADMM, yscale = :log10, xlimit = [1, max(length(traj_res), length(traj_res_fADMM))], grid = true, label = "fADMM", linewidth=2, tickfont = 16)
+# plot!(fig2, 1:length(traj_res_fADMM), traj_res_fADMM, yscale = :log10, xlimit = [1, max(length(traj_res), length(traj_res_fADMM))], grid = true, label = "fADMM", linewidth=2, tickfont = 16)
 
 savefig(fig1, joinpath("media","figs","sharing_problem","SP-Cost-Conver.pdf"))
 savefig(fig2, joinpath("media","figs","sharing_problem","SP-Res-Conver.pdf"))

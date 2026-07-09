@@ -161,6 +161,8 @@ function flattenADMM(root::linknode; tol = tol, λ = λₛ, max_iter = max_iter)
     root_x0 = 2ones(root.nV)
     dict_child_root_old = deepcopy(dict_prime_child)
 
+    push!(traj_J_fADMM,  total_cost(vect_prime(root), root))
+
     for iteration in 1:max_iter
         root.iteration += 1
 
@@ -186,7 +188,7 @@ function flattenADMM(root::linknode; tol = tol, λ = λₛ, max_iter = max_iter)
 
         dict_child_root_old = deepcopy(dict_prime_child)
         assign_node!(root, dict_prime_child)
-        push!(traj_J_fADMM, total_cost(vect_prime(root), root))
+        push!(traj_J_fADMM,  total_cost(vect_prime(root), root))
         push!(traj_res_fADMM, max_residual)
 
         if max_residual < tol
