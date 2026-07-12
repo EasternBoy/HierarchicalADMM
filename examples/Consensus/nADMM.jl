@@ -5,7 +5,8 @@ function update_leaf!(node::linknode, query::Vector{Float64}; λ = λₙ)
     f = node.cost_func
 
     # g = ProximalOperators.NormL1(node.cost_func.w)
-    g = ProximalOperators.CubeNormL2(node.cost_func.w)
+    # g = ProximalOperators.CubeNormL2(node.cost_func.w)
+    g = ProximalOperators.LogisticLoss(node.cost_func.w)
     
     x0 = ones(node.nV)
 
@@ -23,7 +24,9 @@ function update_parent!(node::linknode, top_query::Vector{Float64}, query::Vecto
     f = node.cost_func
 
     # g = ProximalOperators.NormL1(node.cost_func.w)
-    g = ProximalOperators.CubeNormL2(node.cost_func.w)
+    # g = ProximalOperators.CubeNormL2(node.cost_func.w)
+    g = ProximalOperators.LogisticLoss(node.cost_func.w)
+
 
 
     x0 = ones(node.nV)
@@ -45,7 +48,8 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
     f = node.cost_func
 
     # g = ProximalOperators.NormL1(node.cost_func.w)
-    g = ProximalOperators.CubeNormL2(node.cost_func.w)
+    # g = ProximalOperators.CubeNormL2(node.cost_func.w)
+    g = ProximalOperators.LogisticLoss(node.cost_func.w)
 
 
     x0 = ones(node.nV)

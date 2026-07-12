@@ -33,7 +33,8 @@ function update_root_flat!(root::linknode, dict_prime_root::Dict, dict_prime_chi
     )
 
     # g = ProximalOperators.NormL1(root.cost_func.w)
-    g = ProximalOperators.CubeNormL2(root.cost_func.w)
+    # g = ProximalOperators.CubeNormL2(root.cost_func.w)
+    g = ProximalOperators.LogisticLoss(root.cost_func.w)
 
     x0 = ones(maximum(last(index[key]) for key in keys(index)))
 
@@ -55,7 +56,9 @@ function update_leaf_flat(node::linknode, query::Vector{Float64}, λ = λₙ)
     )
 
     # g = ProximalOperators.NormL1(node.cost_func.w)
-    g = ProximalOperators.CubeNormL2(node.cost_func.w)
+    # g = ProximalOperators.CubeNormL2(node.cost_func.w)
+    g = ProximalOperators.LogisticLoss(node.cost_func.w)
+    
 
     x0 = ones(node.nV)
     solution, iterations = node.solver(f = f, g = g, x0 = x0)

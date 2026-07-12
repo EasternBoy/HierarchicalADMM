@@ -17,7 +17,8 @@ function Proximal_Iteration(cost_func::CostFunc, q::Union{Float64, Vector{Float6
     f = cost_func
 
     # g = ProximalOperators.NormL1(cost_func.w)
-    g = ProximalOperators.CubeNormL2(cost_func.w)
+    # g = ProximalOperators.CubeNormL2(cost_func.w)
+    g = ProximalOperators.LogisticLoss(cost_func.w)
     return f, g
 end
 
