@@ -12,13 +12,12 @@ end
 function Proximal_Iteration(cost_func::CostFunc, q::Union{Float64, Vector{Float64}}, λ::Float64)
 
     cost_func.q = q
+
     cost_func.λ = λ
 
     f = cost_func
 
-    # g = ProximalOperators.NormL1(cost_func.w)
-    # g = ProximalOperators.CubeNormL2(cost_func.w)
-    g = ProximalOperators.LogisticLoss(cost_func.w)
+    g = ProximalOperators.IndBox(-Inf, Inf)
     return f, g
 end
 
@@ -60,7 +59,7 @@ function proxAlg!(node::linknode; λ = λₕ)
         f, g = Proximal_Iteration(node.cost_func, p/(nc+1), λ/(nc+1))
     end
 
-    solution, iterations = node.solver(f = f, g = g, x0 = x0)
+    solution, iterations = node.solver(f = f, x0 = x0)
 
     #Update prime variable
 
@@ -94,17 +93,17 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64}; λ = λₕ)
 end
 
 
-function hADMM(root::linknode, opt_sol; tol = tol, λ = λₕ, max_iter = max_iter)
+function hADMM(root::linknode, opt_sol; tol = 1e-4, λₕ = 1., max_iter = 1000)
     global stop_arr
     
-    traj_err = Float64[]
-    traj_res = Float64[]
+    traj_err  = Float64[]
+    traj_res  = Float64[]
     opt_value = Float64[]
     
     for iteration in 1:max_iter
         ter = Float64[]
         push!(opt_value, total_cost(root))
-        hierarchicalADMM!(root, ter; λ = λ)
+        hierarchicalADMM!(root, ter; λ = λₕ)
 
         err = Float64[]
         get_err!(root, opt_sol, err)
@@ -120,9 +119,25 @@ function hADMM(root::linknode, opt_sol; tol = tol, λ = λₕ, max_iter = max_it
     return traj_err, traj_res, opt_value, max_iter
 end
 
+function hADMM_V(root::linknode, opt_root::linknode; λₕ = 1., tol = 1e-4, σ = 1., max_iter = 1000)
+    global stop_arr
+    
+    V_traj = Float64[]
+    
+    for _ in 1:max_iter
+        V   = [0.]
+        ter = Float64[]
+        hierarchicalADMM_V!(root, opt_root, ter, V; λₕ = λₕ, σ = σ)
+        println(V)
+        push!(V_traj, V[1])
 
+        if maximum(ter) < tol
+            return V_traj
+        end
+    end
+end
 
-function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Float64}, V::Vector{Float64}; λₕ::Float64 = 1.)
+function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Float64}, V::Vector{Float64}; λₕ = 1., σ = 1.)
 
     node.iteration += 1
     
@@ -130,7 +145,7 @@ function hierarchicalADMM_V!(node::linknode, opt_node::linknode, ter::Vector{Flo
     proxAlg!(node; λ = λₕ)
 
     y = vec_dual(node) - vec_dual(opt_node)
-    x = node.prime     - opt_node.prime
+    x = node.prime - opt_node.prime
 
     V[1] += λₕ*dot(y, y) + (1/λₕ + σ)*dot(x, x)
 
@@ -162,24 +177,6 @@ function vec_dual(node::linknode)
     return y
 end
 
-
-function hADMM_V(root::linknode, opt_root::linknode; λ = 1., tol = tol, max_iter = max_iter)
-    global stop_arr
-    
-    V_traj = Float64[]
-    
-    for iteration in 1:max_iter
-        V   = [0.]
-        ter = Float64[]
-        hierarchicalADMM_V!(root, opt_root, ter, V; λₕ = λ)
-        println(V)
-        push!(V_traj, V[1])
-
-        if maximum(ter) < tol
-            return V_traj
-        end
-    end
-end
 
 
 

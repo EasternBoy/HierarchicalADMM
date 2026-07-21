@@ -19,15 +19,8 @@ function getCostFunction!(node::linknode, x, J::Vector{NonlinearExpr}, opti)
 
     para = node.cost_func.para
     func = node.cost_func.val
-    w    = node.cost_func.w
 
-    # L1 regularization in JuMP
-    slack = @variable(opti, [1: node.nV])
-
-    @constraint(opti,  slack .>=  x)
-    @constraint(opti,  slack .>= -x)
-
-    push!(J, func(x; para = para) + w*sum(slack))
+    push!(J, func(x; para = para))
     if node.children !== nothing
         for child in node.children
             getCostFunction!(child, x, J, opti)
@@ -40,7 +33,7 @@ function tt_cost_func!(node::linknode, opt_cost)
 
     xlocal          = node.prime
     p               = node.cost_func.para
-    opt_cost.value += node.cost_func.val(xlocal; para = p) + node.cost_func.w * norm(xlocal, 1)
+    opt_cost.value += node.cost_func.val(xlocal; para = p)
 
     if node.children !==  nothing
         for child in node.children

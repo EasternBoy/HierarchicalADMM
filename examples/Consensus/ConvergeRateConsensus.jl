@@ -3,7 +3,7 @@ import Clarabel
 import LinearAlgebra
 import MathOptInterface as MOI
 
-function LMIsolver(A, B, nD, ρ = 1., σ = 0.5, α = 1/2, l = 1/2)
+function LMIsolver(A, B, nD, ρ = 1., σ = 0.5, α = 1/2, l = 5/4)
     
     model = Model(Clarabel.Optimizer)
     set_silent(model) 
@@ -32,13 +32,9 @@ function LMIsolver(A, B, nD, ρ = 1., σ = 0.5, α = 1/2, l = 1/2)
     Λ2 = [Λ2  zeros(size(Λ2, 1), size(B[nD-1], 2))]
     Λ2 = [zeros(size(B[1],1), size(Λ2,2)); Λ2]
 
-    Λ = Λ1 + Λ2
+    Λ   = Λ1 + Λ2
+    
     Ξ11 = Λ*Λ'
-
-    # for row in eachrow(Ξ11)
-    #        println(row)
-    # end
-    # println(minimum(eigvals(Ξ11)))
     
     Ξ11 = 2(1-t)/l*Ξ11
 
@@ -56,7 +52,7 @@ function LMIsolver(A, B, nD, ρ = 1., σ = 0.5, α = 1/2, l = 1/2)
     for d in 2:nD-1
         Ξ44 = blockdiag_dense(Ξ44, A[d]*A[d]')
     end
-    Ξ44 = (1-t)/l*Ξ44 + (1/ρ + σ/ρ^2)*Is
+    Ξ44 = 2*(1-t)/l*Ξ44 + (1/ρ + σ/ρ^2)*Is
 
     #------------------ Calculate Ξ41 ------------------
     Ξ411 = zeros(s[1], s[1])

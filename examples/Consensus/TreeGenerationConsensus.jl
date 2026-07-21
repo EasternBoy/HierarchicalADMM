@@ -4,29 +4,29 @@ include("linknodes.jl")
 # Define cost function and its gradient for each type of node
 ## Leaf nodes
 function cost_func_leaf(x; para)
-    return 1/2*dot(x .- para[1], x .- para[1])
+    return 1/2*dot(x .- para[1], x .- para[1]) + sum(log.(1 .+ exp.(-x)))
 end
 
 function grad_cost_leaf(x; para)
-    return x .- para[1]
+    return x .- para[1] - exp.(-x) ./ (1 .+ exp.(-x))
 end
 
 ## Parent nodes
 function cost_func_parent(x; para)
-    return 1/2*dot(x .- para[1], x .- para[1])
+    return 1/2*dot(x .- para[1], x .- para[1]) + sum(log.(1 .+ exp.(-x)))
 end
 
 function grad_cost_parent(x; para)
-    return x .- para[1]
+    return x .- para[1] - exp.(-x) ./ (1 .+ exp.(-x))
 end
 
 ## Root
 function cost_func_root(x; para)
-    return 1/2*dot(x .- para[1], x .- para[1])
+    return 1/2*dot(x .- para[1], x .- para[1]) + (1/4)*dot(x, x)^2
 end
 
 function grad_cost_root(x; para)
-    return x .- para[1]
+    return x .- para[1] + x*dot(x, x)
 end
 
 function topo_gen!(node::linknode, nN::Int64, nL::Int64, depth=1)
@@ -142,10 +142,10 @@ function print_dict(node::linknode)
 end
 
 function reset!(node::linknode)
-    node.prime = ones(node.nV)  
+    node.prime = 1*ones(node.nV)  
 
     for (x,y) in node.dual
-        node.dual[x] = ones(length(y))  
+        node.dual[x] = zeros(length(y))  
     end
 
     node.com_cost = 0

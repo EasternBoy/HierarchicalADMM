@@ -9,7 +9,7 @@ mutable struct CostFunc
     w::Float64
     
     function CostFunc(val, grad, para)
-        return new(val, grad, para, 0.1, [0.], 2.)
+        return new(val, grad, para, 0.1, [0.], 1.)
     end
 end
 
@@ -35,7 +35,7 @@ mutable struct linknode
         obj.parent    = nothing
         obj.com_cost  = 0
         obj.iteration = 0
-        obj.solver    = ProximalAlgorithms.PANOC(maxit = 1000, tol = 1e-8, verbose = false)
+        obj.solver    = ProximalAlgorithms.ForwardBackward(maxit = 1000, tol = 1e-8, verbose = false)
         return obj
     end
 end
