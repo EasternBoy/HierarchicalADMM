@@ -17,9 +17,9 @@ include("hADMM.jl")
 include("nADMM.jl")
 include("fADMM.jl")
 
-const mode = 3  # 1: optimality gap, 2: run in specific iterations, 3: stopping criteria
-const nN   = 10 
-const nD   = 3
+const mode = 2  # 1: optimality gap, 2: run in specific iterations, 3: stopping criteria
+const nN   = 20 
+const nD   = 5
 
 include("Parameters.jl")
 
@@ -36,9 +36,9 @@ topo_arr = linknode[]
 nTestTopo = 100
 
 fontsize = 16
-figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
-figRes   = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
-figJ     = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iteration in root node", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4])
+figPrime = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iterations", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6])
+figRes   = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iterations", yticks = [1e2, 1e1, 1., 0.1, 1e-2, 1e-3,  1e-4])
+figJ     = plot(framestyle = :box, guidefont = font(16), tickfontsize = fontsize, xlabel = "Number of iterations", yticks = [1, 0.1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6])
 
 
 
@@ -125,18 +125,19 @@ for (key, value) in max_com
     println("$key Maximum number of scalar variables sent by a node (min) avg. (max): ($min_value) $med ($max_value)")
 end
 println()
-figComCost = plot(framestyle = :box, guidefont = fontsize, legendfontsize = fontsize, tickfontsize = fontsize, xlabel = "TotalVals", ylabel = "Optimality Gap", yscale = :log10, xscale = :log10, ylims = [1e-7, 2])
+figComCost = plot(framestyle = :box, guidefont = fontsize, legendfontsize = fontsize, tickfontsize = fontsize, xlabel = "TotalVals", ylabel = "Optimality Gap", yscale = :log10, ylims = [1e-7, 2])
 for (key, value) in tt_com
     med = round(median(value))
     min_value, min_index = findmin(value)
     max_value, max_index = findmax(value)
     println("$key Total number of scalar variables sent in network (min) avg. (max): ($min_value) $med ($max_value)")
     if key == "hADMM" && mode == 2
-        plot!(figComCost, (1:Niter)*mean(value)/Niter, avg_gap_hADMM, label = "hADMM", linewidth = 4)
+        plot!(figComCost, (0:(Niter-1))*mean(value)/(Niter-1), avg_gap_hADMM, label = "hADMM", linewidth = 4, seriestype = :steppost)
         savefig(figComCost, joinpath("media","figs","disjoint_problem",string("Cost-Com-ADMM-D=",string(nD),"-N=",string(nN),".pdf")))
     end
     if key == "fADMM" && mode == 2
-        plot!(figComCost, (1:Niter)*mean(value)/Niter, avg_gap_fADMM, label = "fADMM", linewidth = 4)
+        if nD == 5 plot!(figComCost, (0:(Niter-1))*mean(value)/(Niter-1), avg_gap_fADMM, label = "fADMM", linewidth = 4, seriestype = :steppost, xticks=[2000, 4000, 6000], xlims = [0, 7000])
+        else plot!(figComCost, (0:(Niter-1))*mean(value)/(Niter-1), avg_gap_fADMM, label = "fADMM", linewidth = 4, seriestype = :steppost) end
         savefig(figComCost, joinpath("media","figs","disjoint_problem",string("Cost-Com-ADMM-D=",string(nD),"-N=",string(nN),".pdf")))
     end
 end

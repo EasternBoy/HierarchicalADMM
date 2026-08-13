@@ -35,8 +35,8 @@ network_config = (network_config1, network_config2)
 
 countID = 0
 
-fig = plot(tickfont = font(14), yticks = [1e2, 1, 1e-2, 1e-4, 1e-6], framestyle = :box, legendfont = font(13), size = (600, 300), legend=:bottomright, legendcolumns=2)
-
+fig = plot(tickfont = font(9), guidefont=font(9), yticks = [1e2, 1, 1e-2, 1e-4, 1e-6, 1e-8], framestyle = :box, legendfont = font(9), size = (450, 200), legendcolumns=1, xlabel = "Number of iterations")
+color = ["blue", "red"]
 
 for (index, cfg) in enumerate(network_config)
 
@@ -85,15 +85,16 @@ for (index, cfg) in enumerate(network_config)
 
     reset!(root)
     V_traj = hADMM_V(root, opt_root; tol = 1e-4, λₕ = 1/ρ_best[1], σ = σ_best[1])
-
-    plot!(fig, 0:(length(V_traj)-1), V_traj ./ V_traj[1], yscale = :log10, label = string("Topology $index"), linewidth = 2)
+    
+    plot!(fig, 0:(length(V_traj)-1), V_traj ./ V_traj[1], yscale = :log10, label = string("Topology $index"), linewidth = 2, color=color[index])
     println("For topology $index, the best theoretical rate = $rate_best at rho = $ρ_best, sigma = $σ_best, t = $t")
 
     r = 1/(1+rate_best)
     if index == 1
-        plot!(fig, 0:105, r.^(0:105), yscale = :log10, label = L"1/(1 + 0.097)^k", linewidth = 2, linestyle = :dot)
+        plot!(fig, 0:105, r.^(0:105), yscale = :log10, label = L"1/(1 + 0.097)^k", linewidth = 2, linestyle = :dot, color=color[index])
     else
-        plot!(fig, 0:105, r.^(0:105), yscale = :log10, label = L"1/(1 + 0.023)^k", linewidth = 2, linestyle = :dot)
+        plot!(fig, 0:105, r.^(0:105), yscale = :log10, label = L"1/(1 + 0.023)^k", linewidth = 2, linestyle = :dot, color=color[index], legend = Symbol(:outer, :right))
+
     end
 end
 display(fig)
