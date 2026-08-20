@@ -105,7 +105,7 @@ function hierarchicalADMM!(node::linknode, ter::Vector{Float64})
 end
 
 
-function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_iter = max_iter)
+function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_iter = max_iter,  verbose = false)
     global stop_arr
     
     traj_err = Float64[]
@@ -125,17 +125,17 @@ function hADMM(root::linknode, dict_result::Dict; tol = tol, λ = λₕ, max_ite
 
         if mode == 1
             if abs((opt_value - current_cost)/opt_value) < opt_gap
-                println("hADMM converged after $iteration iterations in root")
+                if verbose println("hADMM converged after $iteration iterations in root") end
                 return traj_err, traj_res, opt_value_hADMM
             end
         elseif mode == 2
             if iteration >= Niter
-                println("hADMM stoped after $iteration iterations in root")
+                if verbose println("hADMM stoped after $iteration iterations in root") end
                 return traj_err, traj_res, opt_value_hADMM
             end
         else
             if maximum(ter) < tol
-                println("hADMM converged after $iteration iterations in root")
+                 if verbose  println("hADMM converged after $iteration iterations in root") end
                 return traj_err, traj_res, opt_value_hADMM
             end
         end

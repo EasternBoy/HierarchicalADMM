@@ -21,9 +21,12 @@ const mode = 3  # 1: optimality gap, 2: run in specific iterations, 3: stopping 
 const nN   = 10 
 const nD   = 3
 
-const λₙ = 0.625e-2
-const λₛ = 0.625e-2
-const λₕ = 0.625e-2
+
+const ρ = 1000
+
+const λₙ = 1/ρ
+const λₛ = 1/ρ
+const λₕ = 1/ρ
 const tol = 1e-4
 const max_iter = 1000
 
@@ -32,6 +35,7 @@ global countID
 global opt_value
 
 node_iter  = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
+root_iter  = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 tt_com     = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 max_com    = Dict("nADMM" => Int64[], "fADMM" => Int64[], "hADMM" => Int64[])
 
@@ -39,8 +43,9 @@ topo_arr = linknode[]
 
 nTestTopo = 100
 
+println("rho = $ρ")
 for tp in 1:nTestTopo
-    println("Solving topology $tp")
+    # println("Solving topology $tp")
 
     global countID = 0
     global opt_value = 0
@@ -61,6 +66,7 @@ for tp in 1:nTestTopo
     total, max_num  = tt_com_iter(root)
 
     push!(node_iter["hADMM"], max_num["iter"])
+    push!(root_iter["hADMM"], root.iteration)
     push!(max_com["hADMM"],   max_num["com"])
     push!(tt_com["hADMM"],    total["com"])
 
@@ -71,6 +77,7 @@ for tp in 1:nTestTopo
     total, max_num = tt_com_iter(root)
     J_opt_nADMM = total_cost(root)
     push!(node_iter["nADMM"], max_num["iter"])
+    push!(root_iter["nADMM"], root.iteration)
     push!(max_com["nADMM"],   max_num["com"])
     push!(tt_com["nADMM"],    total["com"])    
 
@@ -80,6 +87,7 @@ for tp in 1:nTestTopo
 
     total, max_num = tt_com_iter(root)
     push!(node_iter["fADMM"], max_num["iter"])
+    push!(root_iter["fADMM"], root.iteration)
     push!(max_com["fADMM"],   max_num["com"])
     push!(tt_com["fADMM"],    total["com"])
 end
@@ -90,4 +98,11 @@ for (key, value) in node_iter
     min_value, min_index = findmin(value)
     max_value, max_index = findmax(value)
     println("$key Maximum number of iterations in a node (min) avg. (max): ($min_value) $(medstep[key]) ($max_value)")
+end
+
+println()
+for (key, value) in root_iter
+    min_value, min_index = findmin(value)
+    max_value, max_index = findmax(value)
+    println("$key Maximum number of iterations at the root: $max_value (topology $max_index), min: $min_value, median: $(round(median(value))), mean: $(round(mean(value)))")
 end

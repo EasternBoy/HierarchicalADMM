@@ -55,12 +55,12 @@ function update_root!(node::linknode, query::Vector{Float64}; λ = λₙ)
 end
 
 
-function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter)
-
-    node.iteration += 1
+function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_iter, verbose = false)
 
     if node.children !== nothing
         for iteration in 1:max_iter 
+
+            node.iteration += 1 #Add 1 iteration in this node
 
             ter = Float64[]
 
@@ -95,13 +95,14 @@ function nestedADMM!(node::linknode, top_query = 0.; tol = tol, max_iter = max_i
 
             if maximum(abs.(ter)) < tol
                 if node.parent === nothing
-                    println("nADMM converged after $iteration iterations in root")
+                     if verbose  println("nADMM converged after $iteration iterations in root") end
                 end
                 
                 break
             end
         end
     else
+        node.iteration += 1 #Add 1 iteration in this leaf
         com_cost!(node.parent, top_query, 1)
         update_leaf!(node, top_query)
     end

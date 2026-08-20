@@ -94,7 +94,7 @@ end
 
 
 
-function flattenADMM(root::linknode; tol = tol, λ = λₛ, max_iter = max_iter)
+function flattenADMM(root::linknode; tol = tol, λ = λₛ, max_iter = max_iter, verbose = false)
 
     # Flatten the tree structure into a list of nodes
     dict_prime_child = Dict()
@@ -160,17 +160,17 @@ function flattenADMM(root::linknode; tol = tol, λ = λₛ, max_iter = max_iter)
 
         if mode == 1
             if abs((opt_value - current_cost)/opt_value) < opt_gap
-                println("hADMM converged after $iteration iterations in root")
+                if verbose  println("hADMM converged after $iteration iterations in root") end 
                 return opt_value_fADMM
             end
         elseif mode == 2
             if iteration >= Niter
-                println("hADMM stoped after $iteration iterations in root")
+                if verbose  println("hADMM stoped after $iteration iterations in root") end
                 return opt_value_fADMM
             end
         else
             if max_residual < tol
-                println("fADMM converged after $iteration iterations in root")
+                if verbose  println("fADMM converged after $iteration iterations in root") end
                 return opt_value_fADMM
             end
         end
